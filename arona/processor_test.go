@@ -1,4 +1,4 @@
-package arona
+package arona_test
 
 import (
 	"bytes"
@@ -9,14 +9,16 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/arisu-archive/go-arona/arona"
 )
 
 var _ = Describe("Processor", func() {
 	Describe("JSON Serialization", func() {
-		var serializer JSONSerializer
+		var serializer arona.JSONSerializer
 
 		BeforeEach(func() {
-			serializer = &defaultJSONSerializer{}
+			serializer = &arona.DefaultJSONSerializer{}
 		})
 
 		It("should serialize basic types", func() {
@@ -52,18 +54,18 @@ var _ = Describe("Processor", func() {
 	})
 
 	Describe("Processor.Process", func() {
-		var processor *Processor
+		var processor *arona.Processor
 
 		BeforeEach(func() {
-			processor = &Processor{
-				xorKey:         0xD9,
-				jsonSerializer: &defaultJSONSerializer{},
+			processor = &arona.Processor{
+				XorKey:         0xD9,
+				JSONSerializer: &arona.DefaultJSONSerializer{},
 			}
 		})
 
 		It("should process without encryption", func() {
 			body := map[string]any{"key": "value"}
-			key := UserSession{}
+			key := arona.UserSession{}
 
 			result, err := processor.Process(body, key)
 			Expect(err).NotTo(HaveOccurred())
@@ -71,7 +73,7 @@ var _ = Describe("Processor", func() {
 
 			// Verify that the result can be decrypted back to original
 			for i := range result {
-				result[i] ^= processor.xorKey
+				result[i] ^= processor.XorKey
 			}
 			// Decompress it
 			gz, err := gzip.NewReader(bytes.NewReader(result[4:])) // Skip checksum
@@ -81,7 +83,7 @@ var _ = Describe("Processor", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(gz.Close()).To(Succeed())
 			var deserialized map[string]any
-			err = processor.jsonSerializer.Deserialize(decompressed, &deserialized)
+			err = processor.JSONSerializer.Deserialize(decompressed, &deserialized)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(deserialized["key"]).To(Equal("value"))
 		})
@@ -91,7 +93,7 @@ var _ = Describe("Processor", func() {
 			iv := [16]byte{}
 
 			body := map[string]any{"key": "value"}
-			key := UserSession{
+			key := arona.UserSession{
 				AESKey: &aesKey,
 				AESIV:  &iv,
 			}
@@ -102,7 +104,7 @@ var _ = Describe("Processor", func() {
 
 			// Verify that the result can be decrypted back to original
 			for i := range result {
-				result[i] ^= processor.xorKey
+				result[i] ^= processor.XorKey
 			}
 			// Decompress it
 			gz, err := gzip.NewReader(bytes.NewReader(result[4:])) // Skip checksum
@@ -125,7 +127,7 @@ var _ = Describe("Processor", func() {
 			decrypted = decrypted[:len(decrypted)-paddingLen]
 
 			var deserialized map[string]any
-			err = processor.jsonSerializer.Deserialize(decrypted, &deserialized)
+			err = processor.JSONSerializer.Deserialize(decrypted, &deserialized)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(deserialized["key"]).To(Equal("value"))
 		})
@@ -133,7 +135,7 @@ var _ = Describe("Processor", func() {
 		It("should produce different results with different inputs", func() {
 			body1 := map[string]any{"key": "value1"}
 			body2 := map[string]any{"key": "value2"}
-			key := UserSession{}
+			key := arona.UserSession{}
 
 			result1, err1 := processor.Process(body1, key)
 			Expect(err1).NotTo(HaveOccurred())
@@ -146,7 +148,7 @@ var _ = Describe("Processor", func() {
 
 		It("should produce consistent results for same input", func() {
 			body := map[string]any{"key": "value"}
-			key := UserSession{}
+			key := arona.UserSession{}
 
 			result1, err1 := processor.Process(body, key)
 			Expect(err1).NotTo(HaveOccurred())
@@ -159,7 +161,7 @@ var _ = Describe("Processor", func() {
 
 		It("should handle empty request body", func() {
 			body := map[string]any{}
-			key := UserSession{}
+			key := arona.UserSession{}
 
 			result, err := processor.Process(body, key)
 			Expect(err).NotTo(HaveOccurred())
@@ -168,17 +170,17 @@ var _ = Describe("Processor", func() {
 	})
 
 	Describe("Processor.BuildPacket", func() {
-		var processor *Processor
+		var processor *arona.Processor
 
 		BeforeEach(func() {
-			processor = &Processor{}
+			processor = &arona.Processor{}
 		})
 
 		It("should build packet with empty payload", func() {
 			payload := []byte{}
 			protocol := uint32(0x12345678)
 			checksum := uint32(0xDEADBEEF)
-			key := UserSession{
+			key := arona.UserSession{
 				ServerKey: []byte{0x01, 0x02},
 				ServerIV:  []byte{0x03, 0x04},
 			}
@@ -191,7 +193,7 @@ var _ = Describe("Processor", func() {
 			payload := []byte{0x01, 0x02, 0x03}
 			checksum := uint32(0xDEADBEEF)
 			protocol := uint32(0x12345678)
-			key := UserSession{
+			key := arona.UserSession{
 				ServerKey: []byte{0xAA, 0xBB},
 				ServerIV:  []byte{0xCC, 0xDD, 0xEE},
 			}
@@ -215,7 +217,7 @@ var _ = Describe("Processor", func() {
 			}
 			checksum := uint32(0xDEADBEEF)
 			protocol := uint32(0xDEADBEEF)
-			key := UserSession{
+			key := arona.UserSession{
 				ServerKey: []byte{0x01},
 				ServerIV:  []byte{0x02},
 			}
@@ -228,7 +230,7 @@ var _ = Describe("Processor", func() {
 		It("should handle different protocol values", func() {
 			payload := []byte{}
 			checksum := uint32(0)
-			key := UserSession{
+			key := arona.UserSession{
 				ServerKey: []byte{},
 				ServerIV:  []byte{},
 			}

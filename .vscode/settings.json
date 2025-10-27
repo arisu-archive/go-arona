@@ -1,0 +1,25 @@
+{
+  "cSpell.words": [
+    "AESIV",
+    "arisu",
+    "Arona",
+    "canonicalheader",
+    "gosec",
+    "noctx",
+    "nolint",
+    "onsi",
+    "padtext",
+    "PKCS",
+    "unpadded",
+    "Unpadding",
+    "wrapcheck"
+  ],
+  "go.lintTool": "golangci-lint-v2",
+  "go.lintFlags": [
+    "--fix",
+  ],
+  "gopls": {
+    "formatting.local": "github.com/arisu-archive/go-arona",
+    "formatting.gofumpt": true
+  }
+}

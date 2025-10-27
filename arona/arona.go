@@ -11,7 +11,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
-	"sync"
 )
 
 const (
@@ -21,8 +20,7 @@ const (
 )
 
 type Client struct {
-	clientMu sync.Mutex
-	client   *http.Client
+	client *http.Client
 
 	// XorEncryptionKey is the byte used to XOR the payload before sending.
 	XorEncryptionKey byte
@@ -84,23 +82,23 @@ type JSONSerializer interface {
 }
 
 // StdJSONSerializer is the default implementation of JSONSerializer using the encoding/json package.
-type defaultJSONSerializer struct{}
+type DefaultJSONSerializer struct{}
 
 // Serialize serializes a value into JSON.
-func (s *defaultJSONSerializer) Serialize(v any, indent string) ([]byte, error) {
+func (*DefaultJSONSerializer) Serialize(v any, indent string) ([]byte, error) {
 	if indent != "" {
-		return json.MarshalIndent(v, "", indent)
+		return json.MarshalIndent(v, "", indent) //nolint:wrapcheck // no need to wrap
 	}
-	return json.Marshal(v)
+	return json.Marshal(v) //nolint:wrapcheck // no need to wrap
 }
 
 // Deserialize deserializes JSON data into a value.
-func (s *defaultJSONSerializer) Deserialize(data []byte, v any) error {
-	return json.Unmarshal(data, v)
+func (*DefaultJSONSerializer) Deserialize(data []byte, v any) error {
+	return json.Unmarshal(data, v) //nolint:wrapcheck // no need to wrap
 }
 
-func (s *defaultJSONSerializer) DeserializeReader(r io.Reader, v any) error {
-	return json.NewDecoder(r).Decode(v)
+func (*DefaultJSONSerializer) DeserializeReader(r io.Reader, v any) error {
+	return json.NewDecoder(r).Decode(v) //nolint:wrapcheck // no need to wrap
 }
 
 type RequestBuilder struct {
@@ -153,17 +151,20 @@ func (c *Client) Do(ctx context.Context, req *Request, v any) (*Response, error)
 		_, err = io.Copy(v, resp.Body)
 	default:
 		decErr := c.JSONSerializer.DeserializeReader(resp.Body, v)
+		if errors.Is(decErr, io.EOF) {
+			decErr = nil // ignore EOF errors caused by empty response body
+		}
 		if decErr != nil {
 			err = decErr
 		}
 	}
-	return resp, nil
+	return resp, err
 }
 
 func (c *Client) bareDo(ctx context.Context, req *Request) (*Response, error) {
 	resp, err := c.client.Do(req.WithContext(ctx))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("request failed: %w", err)
 	}
 
 	defer resp.Body.Close()
@@ -227,14 +228,14 @@ func (c *Client) buildHTTPRequest(apiType apiType, body *bytes.Buffer, contentTy
 		return nil, fmt.Errorf("URL parse failed: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", u.String(), body)
+	req, err := http.NewRequest(http.MethodPost, u.String(), body) //nolint:noctx // context will be added in Do method
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("request creation failed: %w", err)
 	}
 
 	req.Header.Set("User-Agent", c.UserAgent)
 	req.Header.Set("Content-Type", contentType)
-	req.Header.Set("mx", "2")
+	req.Header.Set("mx", "2") //nolint:canonicalheader // required by API
 	req.Header.Set("Accept-Encoding", "identity")
 
 	return req, nil
@@ -297,7 +298,11 @@ func resolveGatewayURL(server Server) (*url.URL, error) {
 	if !ok {
 		return nil, ErrInvalidServer
 	}
-	return url.Parse(config.GatewayAPI)
+	u, err := url.Parse(config.GatewayAPI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse gateway URL: %w", err)
+	}
+	return u, nil
 }
 
 // resolveGameURL returns the game URL for the specified server.
@@ -306,7 +311,11 @@ func resolveGameURL(server Server) (*url.URL, error) {
 	if !ok {
 		return nil, ErrInvalidServer
 	}
-	return url.Parse(config.GameAPI)
+	u, err := url.Parse(config.GameAPI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse game URL: %w", err)
+	}
+	return u, nil
 }
 
 // initialize sets up the client with default values.
@@ -325,34 +334,32 @@ func (c *Client) initialize() *Client {
 		c.XorEncryptionKey = defaultXorKey
 	}
 	if c.JSONSerializer == nil {
-		c.JSONSerializer = &defaultJSONSerializer{}
+		c.JSONSerializer = &DefaultJSONSerializer{}
 	}
 	c.processor = &Processor{
-		xorKey:         c.XorEncryptionKey,
-		jsonSerializer: c.JSONSerializer,
+		XorKey:         c.XorEncryptionKey,
+		JSONSerializer: c.JSONSerializer,
 	}
 	c.common.client = c
 	return c
 }
 
-type multipartWriter struct {
-	boundary string
-}
+type multipartWriter struct{}
 
-func (mw *multipartWriter) write(packetData []byte) (*bytes.Buffer, string, error) {
+func (*multipartWriter) write(packetData []byte) (*bytes.Buffer, string, error) {
 	buf := &bytes.Buffer{}
 	writer := multipart.NewWriter(buf)
-	writer.SetBoundary(fmt.Sprintf("BestHTTP_HTTPMultiPartForm_%s", randomBoundary()))
+	writer.SetBoundary(fmt.Sprintf("BestHTTP_HTTPMultiPartForm_%s", randomBoundary())) //nolint:errcheck // cannot fail
 
 	part, err := writer.CreateFormFile("mx", "mx.dat")
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("form file creation failed: %w", err)
 	}
 	if _, err := part.Write(packetData); err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("form file write failed: %w", err)
 	}
 	if err := writer.Close(); err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("multipart writer close failed: %w", err)
 	}
 	return buf, writer.FormDataContentType(), nil
 }

@@ -19,7 +19,6 @@ linters:
     - forbidigo
     - funlen
     - gocheckcompilerdirectives
-    - gochecknoglobals
     - gochecknoinits
     - gochecksumtype
     - gocognit
@@ -38,7 +37,6 @@ linters:
     - makezero
     - mirror
     - misspell
-    - mnd
     - musttag
     - nakedret
     - nestif
@@ -137,9 +135,6 @@ linters:
       disable:
         - fieldalignment
       enable-all: true
-      settings:
-        shadow:
-          strict: true
     inamedparam:
       skip-single-param: true
     misspell:
@@ -195,6 +190,11 @@ linters:
           disabled: true
         - name: var-naming
           disabled: true
+        - name: dot-imports
+          arguments:
+            - allowedPackages:
+              - "github.com/onsi/ginkgo/v2"
+              - "github.com/onsi/gomega"
     rowserrcheck:
       packages:
         - github.com/jmoiron/sqlx
@@ -246,11 +246,11 @@ formatters:
         - alias
         - localmodule
     gofumpt:
-      module-path: github.com/arisu-archive/arona-clinet
+      module-path: github.com/arisu-archive/go-arona
       extra-rules: true
     goimports:
       local-prefixes:
-        - github.com/arisu-archive/arona-clinet
+        - github.com/arisu-archive/go-arona
   exclusions:
     generated: lax
     paths:
