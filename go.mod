@@ -6,7 +6,7 @@ toolchain go1.25.3
 
 require (
 	github.com/arisu-archive/arona-protos v0.0.0-20251026081024-10232cf5a070
-	github.com/onsi/ginkgo/v2 v2.27.1
+	github.com/onsi/ginkgo/v2 v2.27.2
 	github.com/onsi/gomega v1.38.2
 )
 
