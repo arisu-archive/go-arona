@@ -63,7 +63,7 @@ var _ = Describe("Processor", func() {
 
 		It("should process without encryption", func() {
 			body := map[string]any{"key": "value"}
-			key := SessionKey{}
+			key := UserSession{}
 
 			result, err := processor.Process(body, key)
 			Expect(err).NotTo(HaveOccurred())
@@ -91,7 +91,7 @@ var _ = Describe("Processor", func() {
 			iv := [16]byte{}
 
 			body := map[string]any{"key": "value"}
-			key := SessionKey{
+			key := UserSession{
 				AESKey: &aesKey,
 				AESIV:  &iv,
 			}
@@ -133,7 +133,7 @@ var _ = Describe("Processor", func() {
 		It("should produce different results with different inputs", func() {
 			body1 := map[string]any{"key": "value1"}
 			body2 := map[string]any{"key": "value2"}
-			key := SessionKey{}
+			key := UserSession{}
 
 			result1, err1 := processor.Process(body1, key)
 			Expect(err1).NotTo(HaveOccurred())
@@ -146,7 +146,7 @@ var _ = Describe("Processor", func() {
 
 		It("should produce consistent results for same input", func() {
 			body := map[string]any{"key": "value"}
-			key := SessionKey{}
+			key := UserSession{}
 
 			result1, err1 := processor.Process(body, key)
 			Expect(err1).NotTo(HaveOccurred())
@@ -159,7 +159,7 @@ var _ = Describe("Processor", func() {
 
 		It("should handle empty request body", func() {
 			body := map[string]any{}
-			key := SessionKey{}
+			key := UserSession{}
 
 			result, err := processor.Process(body, key)
 			Expect(err).NotTo(HaveOccurred())
@@ -178,7 +178,7 @@ var _ = Describe("Processor", func() {
 			payload := []byte{}
 			protocol := uint32(0x12345678)
 			checksum := uint32(0xDEADBEEF)
-			key := SessionKey{
+			key := UserSession{
 				ServerKey: []byte{0x01, 0x02},
 				ServerIV:  []byte{0x03, 0x04},
 			}
@@ -191,7 +191,7 @@ var _ = Describe("Processor", func() {
 			payload := []byte{0x01, 0x02, 0x03}
 			checksum := uint32(0xDEADBEEF)
 			protocol := uint32(0x12345678)
-			key := SessionKey{
+			key := UserSession{
 				ServerKey: []byte{0xAA, 0xBB},
 				ServerIV:  []byte{0xCC, 0xDD, 0xEE},
 			}
@@ -215,7 +215,7 @@ var _ = Describe("Processor", func() {
 			}
 			checksum := uint32(0xDEADBEEF)
 			protocol := uint32(0xDEADBEEF)
-			key := SessionKey{
+			key := UserSession{
 				ServerKey: []byte{0x01},
 				ServerIV:  []byte{0x02},
 			}
@@ -228,7 +228,7 @@ var _ = Describe("Processor", func() {
 		It("should handle different protocol values", func() {
 			payload := []byte{}
 			checksum := uint32(0)
-			key := SessionKey{
+			key := UserSession{
 				ServerKey: []byte{},
 				ServerIV:  []byte{},
 			}

@@ -2,7 +2,7 @@ package arona
 
 import "github.com/arisu-archive/arona-protos/protos"
 
-func NewRequestPacket(protocol protos.Protocol, requestCount int64, session protos.SessionKey) *protos.RequestPacket {
+func newRequestPacket(protocol protos.Protocol, requestCount int64, session protos.SessionKey) *protos.RequestPacket {
 	return &protos.RequestPacket{
 		BasePacket: protos.BasePacket{
 			Protocol:   protocol,

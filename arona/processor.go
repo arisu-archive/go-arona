@@ -69,15 +69,57 @@ func encryptPayload(payload []byte, aesKey [16]byte, iv [16]byte) ([]byte, error
 	}
 
 	// PKCS7 Padding
-	padding := block.BlockSize() - len(payload)%block.BlockSize()
-	padtext := bytes.Repeat([]byte{byte(padding)}, padding)
-	paddedPayload := append(payload, padtext...)
+	paddedPayload := pkcs7Padding(payload, block.BlockSize())
 
 	ciphertext := make([]byte, len(paddedPayload))
 	mode := cipher.NewCBCEncrypter(block, iv[:])
 	mode.CryptBlocks(ciphertext, paddedPayload)
 
 	return ciphertext, nil
+}
+
+func decryptPayload(payload []byte, aesKey [16]byte, iv [16]byte) ([]byte, error) {
+	// AES-128-CBC decryption implementation
+	block, err := aes.NewCipher(aesKey[:])
+	if err != nil {
+		return nil, err
+	}
+
+	if len(payload)%block.BlockSize() != 0 {
+		return nil, fmt.Errorf("ciphertext is not a multiple of the block size")
+	}
+
+	plaintext := make([]byte, len(payload))
+	mode := cipher.NewCBCDecrypter(block, iv[:])
+	mode.CryptBlocks(plaintext, payload)
+
+	// PKCS7 Unpadding
+	unpaddedPayload, err := pkcs7Unpadding(plaintext)
+	if err != nil {
+		return nil, err
+	}
+
+	return unpaddedPayload, nil
+}
+
+func pkcs7Padding(ciphertext []byte, blockSize int) []byte {
+	padding := blockSize - len(ciphertext)%blockSize
+	padtext := bytes.Repeat([]byte{byte(padding)}, padding)
+	return append(ciphertext, padtext...)
+}
+
+var ErrInvalidPadding = fmt.Errorf("invalid padding")
+
+func pkcs7Unpadding(origData []byte) ([]byte, error) {
+	length := len(origData)
+	if length == 0 {
+		return nil, ErrInvalidPadding
+	}
+	unpadding := int(origData[length-1])
+	if unpadding > length {
+		return nil, ErrInvalidPadding
+	}
+	return origData[:(length - unpadding)], nil
 }
 
 func xorPayload(payload []byte, key byte) []byte {
@@ -102,7 +144,7 @@ func compressPayload(payload []byte) ([]byte, error) {
 }
 
 // Process transforms the body through the full cryptographic pipeline.
-func (p *Processor) Process(body any, key SessionKey) ([]byte, error) {
+func (p *Processor) Process(body any, key UserSession) ([]byte, error) {
 	// Step 1: Serialize to JSON
 	payload, err := p.jsonSerializer.Serialize(body, "")
 	if err != nil {
@@ -115,7 +157,6 @@ func (p *Processor) Process(body any, key SessionKey) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("encryption failed: %w", err)
 		}
-
 	}
 	payloadLength := uint32(len(payload))
 
@@ -135,7 +176,7 @@ func (p *Processor) Process(body any, key SessionKey) ([]byte, error) {
 }
 
 // BuildPacket constructs the final packet with protocol header and server keys.
-func (p *Processor) BuildPacket(payload []byte, checksum, encodedProtocol uint32, key SessionKey) []byte {
+func (p *Processor) BuildPacket(payload []byte, checksum, encodedProtocol uint32, key UserSession) []byte {
 	var packet bytes.Buffer
 
 	// Payload checksum
