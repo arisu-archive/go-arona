@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,10 +12,12 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+
+	"github.com/arisu-archive/arona-protos/protos"
 )
 
 const (
-	Version          = "1.82.376243"
+	Version          = "1.82.378581"
 	defaultUserAgent = "BestHTTP/2 v2.4.0"
 	defaultXorKey    = 0xD9
 )
@@ -31,6 +34,11 @@ type Client struct {
 	// User agent used when communicating with the game API.
 	UserAgent string
 
+	ProtocolEncoderURL *url.URL // URL of the protocol encoder service.
+
+	// PublicKey is the RSA public key used for encrypting sensitive data.
+	publicKey rsa.PublicKey
+
 	Server     Server   // The server to which requests will be sent.
 	GatewayURL *url.URL // Base URL for gateway requests. Defaults based on the provided server variable.
 	GameURL    *url.URL // Base URL for game requests. Defaults based on the provided server variable.
@@ -39,6 +47,12 @@ type Client struct {
 
 	common service // Reuse a single struct instead of allocating one for each service on the heap.
 	// Services used for talking to different parts of the game API.
+	Account       *AccountService
+	Clan          *ClanService
+	EliminateRaid *EliminateRaidService
+	Friend        *FriendService
+	Queuing       *QueuingService
+	Raid          *RaidService
 }
 
 // service represents a service for interacting with a specific part of the game API.
@@ -48,10 +62,10 @@ type service struct {
 
 // UserSession holds keys and IVs used for encrypting and forging packets.
 type UserSession struct {
-	AESKey    *[16]byte // Optional AES encryption key
-	AESIV     *[16]byte // Optional AES initialization vector
-	ServerKey []byte    // Server key to include in packet
-	ServerIV  []byte    // Server IV to include in packet
+	protos.SessionKey // Session key information
+	ClientKeyBundle   *AESKeyBundle
+	ServerKeyBundle   *AESKeyBundle
+	RequestCount      int64
 }
 
 // apiType represents the type of API being accessed.
@@ -61,6 +75,14 @@ const (
 	gateway apiType = iota
 	game
 )
+
+// requestParams groups arguments for newRequest so we don't exceed argument limits.
+type requestParams struct {
+	apiType  apiType
+	protocol protos.Protocol
+	body     RequestPacketReader
+	session  UserSession
+}
 
 // Request represents an API request.
 type Request struct {
@@ -117,24 +139,36 @@ func (rb *RequestBuilder) WithSession(session UserSession) *RequestBuilder {
 	return rb
 }
 
-func (rb *RequestBuilder) Gateway(encodedProtocol uint32, body any) (*Request, error) {
-	return rb.client.newRequest(gateway, encodedProtocol, body, rb.session)
+func (rb *RequestBuilder) Gateway(ctx context.Context, protocol protos.Protocol, body RequestPacketReader) (*Request, error) {
+	return rb.client.newRequest(ctx, requestParams{
+		apiType:  gateway,
+		protocol: protocol,
+		body:     body,
+		session:  rb.session,
+	})
 }
 
-func (rb *RequestBuilder) Game(encodedProtocol uint32, body any) (*Request, error) {
-	return rb.client.newRequest(game, encodedProtocol, body, rb.session)
+func (rb *RequestBuilder) Game(ctx context.Context, protocol protos.Protocol, body RequestPacketReader) (*Request, error) {
+	return rb.client.newRequest(ctx, requestParams{
+		apiType:  game,
+		protocol: protocol,
+		body:     body,
+		session:  rb.session,
+	})
 }
 
 // NewClient returns a new Arona API client. If a nil httpClient is
 // provided, a new http.Client will be used.
-func NewClient(server Server, httpClient *http.Client) *Client {
+func NewClient(server Server, protocolEncoderURL *url.URL, publicKey rsa.PublicKey, httpClient *http.Client) *Client {
 	if httpClient == nil {
 		httpClient = &http.Client{}
 	}
 	httpClient2 := *httpClient
 	c := &Client{
-		client: &httpClient2,
-		Server: server,
+		client:             &httpClient2,
+		ProtocolEncoderURL: protocolEncoderURL,
+		Server:             server,
+		publicKey:          publicKey,
 	}
 	return c.initialize()
 }
@@ -171,13 +205,13 @@ func (c *Client) bareDo(ctx context.Context, req *Request) (*Response, error) {
 
 	// Determine if response should be decrypted based on session keys
 	// If we have server keys, we expect encrypted content that needs decryption
-	if len(req.SessionKey.ServerKey) > 0 && len(req.SessionKey.ServerIV) > 0 {
+	if req.SessionKey.ServerKeyBundle != nil {
 		// Decrypt the response
 		ciphertext, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("response read failed: %w", err)
 		}
-		decryptedData, err := decryptPayload(ciphertext, *req.SessionKey.AESKey, *req.SessionKey.AESIV)
+		decryptedData, err := decryptPayload(ciphertext, req.SessionKey.ClientKeyBundle.Key, req.SessionKey.ClientKeyBundle.IV)
 		if err != nil {
 			return nil, fmt.Errorf("response decryption failed: %w", err)
 		}
@@ -191,16 +225,24 @@ func (c *Client) bareDo(ctx context.Context, req *Request) (*Response, error) {
 // newRequest creates a new API request. A relative URL can be provided in urlStr,
 // in which case it is resolved relative to the BaseURL of the Client.
 // Relative URLs should always be specified without a preceding slash.
-func (c *Client) newRequest(apiType apiType, encodedProtocol uint32, body any, key UserSession) (*Request, error) {
+func (c *Client) newRequest(
+	ctx context.Context,
+	params requestParams,
+) (*Request, error) {
+	c.populate(params.body.Packet(), params.protocol, WithSessionKey(params.session))
 	// Process payload through crypto pipeline
-	payload, err := c.processor.Process(body, key)
+	payload, err := c.processor.Process(params.body, params.session)
 	if err != nil {
 		return nil, err
 	}
 	// Encode protocol with checksum
 	checksum := computeHash(payload, 0)
+	encodedProtocol, err := c.encodeProtocol(ctx, checksum, params.protocol)
+	if err != nil {
+		return nil, fmt.Errorf("protocol encoding failed: %w", err)
+	}
 	// Build final packet
-	packetData := c.processor.BuildPacket(payload, checksum, encodedProtocol, key)
+	packetData := c.processor.BuildPacket(payload, checksum, encodedProtocol, params.session)
 	// Create multipart form
 	mw := &multipartWriter{}
 	buf, contentType, err := mw.write(packetData)
@@ -209,15 +251,15 @@ func (c *Client) newRequest(apiType apiType, encodedProtocol uint32, body any, k
 	}
 
 	// Build HTTP request
-	req, err := c.buildHTTPRequest(apiType, buf, contentType)
+	req, err := c.buildHTTPRequest(params.apiType, buf, contentType)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Request{
 		Request:    req,
-		apiType:    apiType,
-		SessionKey: key,
+		apiType:    params.apiType,
+		SessionKey: params.session,
 	}, nil
 }
 
@@ -341,6 +383,12 @@ func (c *Client) initialize() *Client {
 		JSONSerializer: c.JSONSerializer,
 	}
 	c.common.client = c
+	c.Account = (*AccountService)(&c.common)
+	c.Clan = (*ClanService)(&c.common)
+	c.EliminateRaid = (*EliminateRaidService)(&c.common)
+	c.Friend = (*FriendService)(&c.common)
+	c.Queuing = (*QueuingService)(&c.common)
+	c.Raid = (*RaidService)(&c.common)
 	return c
 }
 

@@ -61,9 +61,9 @@ type Processor struct {
 	JSONSerializer JSONSerializer
 }
 
-func encryptPayload(payload []byte, aesKey, iv [16]byte) ([]byte, error) {
+func encryptPayload(payload, aesKey, iv []byte) ([]byte, error) {
 	// AES-128-CBC encryption implementation
-	block, err := aes.NewCipher(aesKey[:])
+	block, err := aes.NewCipher(aesKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create AES cipher for encryption: %w", err)
 	}
@@ -72,21 +72,21 @@ func encryptPayload(payload []byte, aesKey, iv [16]byte) ([]byte, error) {
 	paddedPayload := pkcs7Padding(payload, block.BlockSize())
 
 	ciphertext := make([]byte, len(paddedPayload))
-	mode := cipher.NewCBCEncrypter(block, iv[:])
+	mode := cipher.NewCBCEncrypter(block, iv)
 	mode.CryptBlocks(ciphertext, paddedPayload)
 
 	return ciphertext, nil
 }
 
-func decryptPayload(payload []byte, aesKey, iv [16]byte) ([]byte, error) {
+func decryptPayload(payload, aesKey, iv []byte) ([]byte, error) {
 	// AES-128-CBC decryption implementation
-	block, err := aes.NewCipher(aesKey[:])
+	block, err := aes.NewCipher(aesKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create AES cipher for decryption: %w", err)
 	}
 
 	plaintext := make([]byte, len(payload))
-	mode := cipher.NewCBCDecrypter(block, iv[:])
+	mode := cipher.NewCBCDecrypter(block, iv)
 	mode.CryptBlocks(plaintext, payload)
 
 	// PKCS7 Unpadding
@@ -148,8 +148,8 @@ func (p *Processor) Process(body any, key UserSession) ([]byte, error) {
 	}
 
 	// Step 2: Optional AES encryption
-	if key.AESKey != nil && key.AESIV != nil {
-		payload, err = encryptPayload(payload, *key.AESKey, *key.AESIV)
+	if key.ClientKeyBundle != nil {
+		payload, err = encryptPayload(payload, key.ClientKeyBundle.Key, key.ClientKeyBundle.IV)
 		if err != nil {
 			return nil, fmt.Errorf("encryption failed: %w", err)
 		}
@@ -187,10 +187,10 @@ func (*Processor) BuildPacket(payload []byte, checksum, encodedProtocol uint32, 
 	packet.Write(protocolHeader)
 
 	// Server key/IV metadata
-	packet.WriteByte(byte(len(key.ServerKey)))
-	packet.WriteByte(byte(len(key.ServerIV)))
-	packet.Write(key.ServerKey)
-	packet.Write(key.ServerIV)
+	packet.WriteByte(byte(len(key.ServerKeyBundle.Key)))
+	packet.WriteByte(byte(len(key.ServerKeyBundle.IV)))
+	packet.Write(key.ServerKeyBundle.Key)
+	packet.Write(key.ServerKeyBundle.IV)
 	packet.Write(payload)
 	return packet.Bytes()
 }

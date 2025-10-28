@@ -89,13 +89,15 @@ var _ = Describe("Processor", func() {
 		})
 
 		It("should process with encryption", func() {
-			aesKey := [16]byte{}
-			iv := [16]byte{}
+			aesKey := []byte{}
+			iv := []byte{}
 
 			body := map[string]any{"key": "value"}
 			key := arona.UserSession{
-				AESKey: &aesKey,
-				AESIV:  &iv,
+				ClientKeyBundle: &arona.AESKeyBundle{
+					Key: aesKey,
+					IV:  iv,
+				},
 			}
 
 			result, err := processor.Process(body, key)
@@ -115,11 +117,11 @@ var _ = Describe("Processor", func() {
 			Expect(gz.Close()).To(Succeed())
 
 			// Decrypt AES
-			block, err := aes.NewCipher(aesKey[:])
+			block, err := aes.NewCipher(aesKey)
 			Expect(err).NotTo(HaveOccurred())
 
 			decrypted := make([]byte, len(decompressed))
-			mode := cipher.NewCBCDecrypter(block, iv[:])
+			mode := cipher.NewCBCDecrypter(block, iv)
 			mode.CryptBlocks(decrypted, decompressed)
 
 			// Remove PKCS7 padding
@@ -181,8 +183,10 @@ var _ = Describe("Processor", func() {
 			protocol := uint32(0x12345678)
 			checksum := uint32(0xDEADBEEF)
 			key := arona.UserSession{
-				ServerKey: []byte{0x01, 0x02},
-				ServerIV:  []byte{0x03, 0x04},
+				ServerKeyBundle: &arona.AESKeyBundle{
+					Key: []byte{0x01, 0x02},
+					IV:  []byte{0x03, 0x04},
+				},
 			}
 
 			result := processor.BuildPacket(payload, checksum, protocol, key)
@@ -194,20 +198,22 @@ var _ = Describe("Processor", func() {
 			checksum := uint32(0xDEADBEEF)
 			protocol := uint32(0x12345678)
 			key := arona.UserSession{
-				ServerKey: []byte{0xAA, 0xBB},
-				ServerIV:  []byte{0xCC, 0xDD, 0xEE},
+				ServerKeyBundle: &arona.AESKeyBundle{
+					Key: []byte{0xAA, 0xBB},
+					IV:  []byte{0xCC, 0xDD, 0xEE},
+				},
 			}
 
 			result := processor.BuildPacket(payload, checksum, protocol, key)
 			Expect(len(result)).To(Equal(4 + 4 + 1 + 1 + 2 + 3 + 3))
 			// Check the format: 4 bytes checksum + 4 bytes protocol + lengths + keys + iv + payload
-			Expect(result[0:4]).To(Equal([]byte{0xEF, 0xBE, 0xAD, 0xDE}))   // Checksum
-			Expect(result[4:8]).To(Equal([]byte{0x78, 0x56, 0x34, 0x12}))   // Protocol
-			Expect(result[8:9]).To(Equal([]byte{byte(len(key.ServerKey))})) // ServerKey length
-			Expect(result[9:10]).To(Equal([]byte{byte(len(key.ServerIV))})) // ServerIV length
-			Expect(result[10:12]).To(Equal(key.ServerKey))                  // ServerKey
-			Expect(result[12:15]).To(Equal(key.ServerIV))                   // ServerIV
-			Expect(result[15:]).To(Equal(payload))                          // Payload
+			Expect(result[0:4]).To(Equal([]byte{0xEF, 0xBE, 0xAD, 0xDE}))             // Checksum
+			Expect(result[4:8]).To(Equal([]byte{0x78, 0x56, 0x34, 0x12}))             // Protocol
+			Expect(result[8:9]).To(Equal([]byte{byte(len(key.ServerKeyBundle.Key))})) // ServerKey length
+			Expect(result[9:10]).To(Equal([]byte{byte(len(key.ServerKeyBundle.IV))})) // ServerIV length
+			Expect(result[10:12]).To(Equal(key.ServerKeyBundle.Key))                  // ServerKey
+			Expect(result[12:15]).To(Equal(key.ServerKeyBundle.IV))                   // ServerIV
+			Expect(result[15:]).To(Equal(payload))                                    // Payload
 		})
 
 		It("should handle large payloads", func() {
@@ -218,8 +224,10 @@ var _ = Describe("Processor", func() {
 			checksum := uint32(0xDEADBEEF)
 			protocol := uint32(0xDEADBEEF)
 			key := arona.UserSession{
-				ServerKey: []byte{0x01},
-				ServerIV:  []byte{0x02},
+				ServerKeyBundle: &arona.AESKeyBundle{
+					Key: []byte{0x01},
+					IV:  []byte{0x02},
+				},
 			}
 
 			result := processor.BuildPacket(payload, checksum, protocol, key)
@@ -231,8 +239,10 @@ var _ = Describe("Processor", func() {
 			payload := []byte{}
 			checksum := uint32(0)
 			key := arona.UserSession{
-				ServerKey: []byte{},
-				ServerIV:  []byte{},
+				ServerKeyBundle: &arona.AESKeyBundle{
+					Key: []byte{},
+					IV:  []byte{},
+				},
 			}
 
 			tests := []uint32{0x00000000, 0xFFFFFFFF, 0x12345678, 0xAABBCCDD}
