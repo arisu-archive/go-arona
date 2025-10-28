@@ -30,9 +30,9 @@ func (*Client) populate(packet *protos.RequestPacket, protocol protos.Protocol, 
 	}
 }
 
-func rsaEncrypt(data []byte, publicKey rsa.PublicKey) []byte {
+func rsaEncrypt(data []byte, publicKey *rsa.PublicKey) []byte {
 	// Use RSA OAEP SHA-1 for encryption
-	encryptedData, err := rsa.EncryptOAEP(sha1.New(), rand.Reader, &publicKey, data, nil) //nolint:gosec // RSA OAEP with SHA-1 is used by the protocol
+	encryptedData, err := rsa.EncryptOAEP(sha1.New(), rand.Reader, publicKey, data, nil) //nolint:gosec // RSA OAEP with SHA-1 is used by the protocol
 	if err != nil {
 		panic(fmt.Sprintf("RSA encryption failed: %v", err))
 	}

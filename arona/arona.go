@@ -37,7 +37,7 @@ type Client struct {
 	ProtocolEncoderURL *url.URL // URL of the protocol encoder service.
 
 	// PublicKey is the RSA public key used for encrypting sensitive data.
-	publicKey rsa.PublicKey
+	publicKey *rsa.PublicKey
 
 	Server     Server   // The server to which requests will be sent.
 	GatewayURL *url.URL // Base URL for gateway requests. Defaults based on the provided server variable.
@@ -159,7 +159,7 @@ func (rb *RequestBuilder) Game(ctx context.Context, protocol protos.Protocol, bo
 
 // NewClient returns a new Arona API client. If a nil httpClient is
 // provided, a new http.Client will be used.
-func NewClient(server Server, protocolEncoderURL *url.URL, publicKey rsa.PublicKey, httpClient *http.Client) *Client {
+func NewClient(server Server, protocolEncoderURL *url.URL, publicKey *rsa.PublicKey, httpClient *http.Client) *Client {
 	if httpClient == nil {
 		httpClient = &http.Client{}
 	}
