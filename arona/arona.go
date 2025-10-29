@@ -50,6 +50,7 @@ type Client struct {
 	common service // Reuse a single struct instead of allocating one for each service on the heap.
 	// Services used for talking to different parts of the game API.
 	Account       *AccountService
+	Arena         *ArenaService
 	Clan          *ClanService
 	EliminateRaid *EliminateRaidService
 	Friend        *FriendService
@@ -207,6 +208,7 @@ func (c *Client) initialize() *Client {
 	}
 	c.common.client = c
 	c.Account = (*AccountService)(&c.common)
+	c.Arena = (*ArenaService)(&c.common)
 	c.Clan = (*ClanService)(&c.common)
 	c.EliminateRaid = (*EliminateRaidService)(&c.common)
 	c.Friend = (*FriendService)(&c.common)
