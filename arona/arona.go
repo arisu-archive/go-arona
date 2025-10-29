@@ -66,8 +66,8 @@ type service struct {
 // UserSession holds keys and IVs used for encrypting and forging packets.
 type UserSession struct {
 	protos.SessionKey // Session key information
-	ClientKeyBundle   *AESKeyBundle
-	ServerKeyBundle   *AESKeyBundle
+	ClientKeyBundle   AESKeyBundle
+	ServerKeyBundle   AESKeyBundle
 	RequestCount      int64
 }
 
@@ -264,7 +264,7 @@ func (c *Client) bareDo(ctx context.Context, req *Request) (*Response, error) {
 
 	// Determine if response should be decrypted based on session keys
 	// If we have server keys, we expect encrypted content that needs decryption
-	if req.SessionKey.ServerKeyBundle != nil {
+	if len(req.SessionKey.ServerKeyBundle.Key) > 0 && len(req.SessionKey.ServerKeyBundle.IV) > 0 {
 		// Decrypt the response
 		ciphertext, err := io.ReadAll(resp.Body)
 		if err != nil {

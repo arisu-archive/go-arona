@@ -94,7 +94,7 @@ var _ = Describe("Processor", func() {
 
 			body := map[string]any{"key": "value"}
 			key := arona.UserSession{
-				ClientKeyBundle: &arona.AESKeyBundle{
+				ClientKeyBundle: arona.AESKeyBundle{
 					Key: aesKey,
 					IV:  iv,
 				},
@@ -183,7 +183,7 @@ var _ = Describe("Processor", func() {
 			protocol := uint32(0x12345678)
 			checksum := uint32(0xDEADBEEF)
 			key := arona.UserSession{
-				ServerKeyBundle: &arona.AESKeyBundle{
+				ServerKeyBundle: arona.AESKeyBundle{
 					Key: []byte{0x01, 0x02},
 					IV:  []byte{0x03, 0x04},
 				},
@@ -198,7 +198,7 @@ var _ = Describe("Processor", func() {
 			checksum := uint32(0xDEADBEEF)
 			protocol := uint32(0x12345678)
 			key := arona.UserSession{
-				ServerKeyBundle: &arona.AESKeyBundle{
+				ServerKeyBundle: arona.AESKeyBundle{
 					Key: []byte{0xAA, 0xBB},
 					IV:  []byte{0xCC, 0xDD, 0xEE},
 				},
@@ -224,7 +224,7 @@ var _ = Describe("Processor", func() {
 			checksum := uint32(0xDEADBEEF)
 			protocol := uint32(0xDEADBEEF)
 			key := arona.UserSession{
-				ServerKeyBundle: &arona.AESKeyBundle{
+				ServerKeyBundle: arona.AESKeyBundle{
 					Key: []byte{0x01},
 					IV:  []byte{0x02},
 				},
@@ -239,7 +239,7 @@ var _ = Describe("Processor", func() {
 			payload := []byte{}
 			checksum := uint32(0)
 			key := arona.UserSession{
-				ServerKeyBundle: &arona.AESKeyBundle{
+				ServerKeyBundle: arona.AESKeyBundle{
 					Key: []byte{},
 					IV:  []byte{},
 				},

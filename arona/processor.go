@@ -148,7 +148,7 @@ func (p *Processor) Process(body any, key UserSession) ([]byte, error) {
 	}
 
 	// Step 2: Optional AES encryption
-	if key.ClientKeyBundle != nil {
+	if len(key.ClientKeyBundle.Key) > 0 && len(key.ClientKeyBundle.IV) > 0 {
 		payload, err = encryptPayload(payload, key.ClientKeyBundle.Key, key.ClientKeyBundle.IV)
 		if err != nil {
 			return nil, fmt.Errorf("encryption failed: %w", err)
