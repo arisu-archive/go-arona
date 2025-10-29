@@ -23,8 +23,15 @@ func WithSessionKey(session UserSession) PacketPopulatorOption {
 	}
 }
 
+func WithRequestCount(requestCount int64) PacketPopulatorOption {
+	return func(packet *protos.RequestPacket) {
+		packet.Hash = requestCount | (int64(packet.Protocol) << 32)
+	}
+}
+
 func (*Client) populate(packet *protos.RequestPacket, protocol protos.Protocol, opts ...PacketPopulatorOption) {
 	packet.Protocol = protocol
+	packet.Hash = 1 | (int64(packet.Protocol) << 32)
 	for _, opt := range opts {
 		opt(packet)
 	}
