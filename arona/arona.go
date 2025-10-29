@@ -12,6 +12,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"sync"
 
 	"github.com/arisu-archive/arona-protos/protos"
 )
@@ -23,7 +24,8 @@ const (
 )
 
 type Client struct {
-	client *http.Client
+	clientMu sync.Mutex
+	client   *http.Client
 
 	// XorEncryptionKey is the byte used to XOR the payload before sending.
 	XorEncryptionKey byte
@@ -39,7 +41,7 @@ type Client struct {
 	// PublicKey is the RSA public key used for encrypting sensitive data.
 	publicKey *rsa.PublicKey
 
-	Server     Server   // The server to which requests will be sent.
+	server     Server   // The server to which requests will be sent.
 	GatewayURL *url.URL // Base URL for gateway requests. Defaults based on the provided server variable.
 	GameURL    *url.URL // Base URL for game requests. Defaults based on the provided server variable.
 
@@ -167,10 +169,65 @@ func NewClient(server Server, protocolEncoderURL *url.URL, publicKey *rsa.Public
 	c := &Client{
 		client:             &httpClient2,
 		ProtocolEncoderURL: protocolEncoderURL,
-		Server:             server,
+		server:             server,
 		publicKey:          publicKey,
 	}
 	return c.initialize()
+}
+
+func (c *Client) WithServer(server Server) *Client {
+	// Copy a new Client to avoid modifying the original
+	c2 := c.copy()
+	defer c2.initialize()
+	c2.server = server
+	return c2
+}
+
+// initialize sets up the client with default values.
+func (c *Client) initialize() *Client {
+	// Set default URLs based on the server
+	if c.GatewayURL == nil {
+		c.GatewayURL, _ = resolveGatewayURL(c.server)
+	}
+	if c.GameURL == nil {
+		c.GameURL, _ = resolveGameURL(c.server)
+	}
+	if c.UserAgent == "" {
+		c.UserAgent = defaultUserAgent
+	}
+	if c.XorEncryptionKey == 0 {
+		c.XorEncryptionKey = defaultXorKey
+	}
+	if c.JSONSerializer == nil {
+		c.JSONSerializer = &DefaultJSONSerializer{}
+	}
+	c.processor = &Processor{
+		XorKey:         c.XorEncryptionKey,
+		JSONSerializer: c.JSONSerializer,
+	}
+	c.common.client = c
+	c.Account = (*AccountService)(&c.common)
+	c.Clan = (*ClanService)(&c.common)
+	c.EliminateRaid = (*EliminateRaidService)(&c.common)
+	c.Friend = (*FriendService)(&c.common)
+	c.Queuing = (*QueuingService)(&c.common)
+	c.Raid = (*RaidService)(&c.common)
+	return c
+}
+
+func (c *Client) copy() *Client {
+	c.clientMu.Lock()
+	clone := &Client{
+		client:             &http.Client{},
+		publicKey:          c.publicKey,
+		UserAgent:          c.UserAgent,
+		XorEncryptionKey:   c.XorEncryptionKey,
+		ProtocolEncoderURL: c.ProtocolEncoderURL,
+		JSONSerializer:     c.JSONSerializer,
+	}
+	c.clientMu.Unlock()
+	// Shallow copy is sufficient since fields are either value types or pointers
+	return clone
 }
 
 func (c *Client) Do(ctx context.Context, req *Request, v any) (*Response, error) {
@@ -358,38 +415,6 @@ func resolveGameURL(server Server) (*url.URL, error) {
 		return nil, fmt.Errorf("failed to parse game URL: %w", err)
 	}
 	return u, nil
-}
-
-// initialize sets up the client with default values.
-func (c *Client) initialize() *Client {
-	// Set default URLs based on the server
-	if c.GatewayURL == nil {
-		c.GatewayURL, _ = resolveGatewayURL(c.Server)
-	}
-	if c.GameURL == nil {
-		c.GameURL, _ = resolveGameURL(c.Server)
-	}
-	if c.UserAgent == "" {
-		c.UserAgent = defaultUserAgent
-	}
-	if c.XorEncryptionKey == 0 {
-		c.XorEncryptionKey = defaultXorKey
-	}
-	if c.JSONSerializer == nil {
-		c.JSONSerializer = &DefaultJSONSerializer{}
-	}
-	c.processor = &Processor{
-		XorKey:         c.XorEncryptionKey,
-		JSONSerializer: c.JSONSerializer,
-	}
-	c.common.client = c
-	c.Account = (*AccountService)(&c.common)
-	c.Clan = (*ClanService)(&c.common)
-	c.EliminateRaid = (*EliminateRaidService)(&c.common)
-	c.Friend = (*FriendService)(&c.common)
-	c.Queuing = (*QueuingService)(&c.common)
-	c.Raid = (*RaidService)(&c.common)
-	return c
 }
 
 type multipartWriter struct{}
