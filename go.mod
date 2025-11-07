@@ -2,7 +2,7 @@ module github.com/arisu-archive/go-arona
 
 go 1.24.3
 
-toolchain go1.25.3
+toolchain go1.25.4
 
 require (
 	github.com/arisu-archive/arona-flatbuffers v0.3.1
