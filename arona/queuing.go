@@ -37,7 +37,12 @@ func (s *QueuingService) GetTicket(ctx context.Context, data GetTicketOptions) (
 			AccessIP:      defaultAccessIP,
 		},
 	}
-	req, err := s.client.R().Gateway(ctx, protos.Protocol_Queuing_GetTicketGL, param)
+	req, err := s.client.R().Gateway(
+		ctx,
+		protos.Protocol_Queuing_GetTicketGL,
+		param,
+		WithHash(0),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create get ticket request: %w", err)
 	}
