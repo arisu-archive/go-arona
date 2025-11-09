@@ -4,6 +4,8 @@ github.com/arisu-archive/arona-flatbuffers v0.3.1 h1:lNNiPOzMm9wpbeFnXJDGXOzsqKM
 github.com/arisu-archive/arona-flatbuffers v0.3.1/go.mod h1:BdAWEPzwiSZGf6pbT9pzgTADu/UVgrYzP1Ld2bmCeME=
 github.com/arisu-archive/arona-protos v0.0.0-20251029140407-fc00be0af76c h1:7q59iz/mXE7Pw435VVLATtkslqbfuM9RByZqlBpjlu4=
 github.com/arisu-archive/arona-protos v0.0.0-20251029140407-fc00be0af76c/go.mod h1:zH9gdPw0w2KJabAj499hSw0S7L5hbtXauUoQg32g3jc=
+github.com/arisu-archive/arona-protos v0.0.0-20251109135738-d9a429885b42 h1:kxhZ4/dBzsbrxS5/skNTSMghX06k+o5c6B9hkX9WQ7c=
+github.com/arisu-archive/arona-protos v0.0.0-20251109135738-d9a429885b42/go.mod h1:zH9gdPw0w2KJabAj499hSw0S7L5hbtXauUoQg32g3jc=
 github.com/arisu-archive/bluearchive-fbs-utils v0.0.0-20251025193505-8e0d5e7baff5 h1:XSk7xahyNnYkp4UZlfoFSLqlZZZXx2lMe07yjbFeGU4=
 github.com/arisu-archive/bluearchive-fbs-utils v0.0.0-20251025193505-8e0d5e7baff5/go.mod h1:n9PFVpzLtcrThjXgFe1TLTdGdZZ/WrSewzzMCS4IDrs=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
