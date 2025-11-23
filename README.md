@@ -1,3 +1,5 @@
+<div align="center">
+
 # 🎮 Arona Client
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/arisu-archive/go-arona.svg)](https://pkg.go.dev/github.com/arisu-archive/go-arona) [![Go Report Card](https://goreportcard.com/badge/github.com/arisu-archive/go-arona)](https://goreportcard.com/report/github.com/arisu-archive/go-arona) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -6,6 +8,7 @@
 
 [Features](#-features) • [Installation](#-installation) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Contributing](#-contributing)
 
+</div>
 
 ---
 
