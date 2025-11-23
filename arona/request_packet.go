@@ -18,8 +18,8 @@ type PacketPopulatorOption func(*protos.RequestPacket)
 
 func withSessionKey(session *UserSession) PacketPopulatorOption {
 	return func(packet *protos.RequestPacket) {
+		// Skip if session key is empty
 		if session == nil || reflect.ValueOf(session.SessionKey).IsZero() {
-			// Skip if session key is empty
 			return
 		}
 		packet.SessionKey = session.SessionKey
