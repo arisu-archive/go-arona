@@ -8,7 +8,7 @@ require (
 	github.com/arisu-archive/arona-flatbuffers v0.3.1
 	github.com/arisu-archive/arona-protos v0.0.0-20251109135738-d9a429885b42
 	github.com/google/uuid v1.6.0
-	github.com/onsi/ginkgo/v2 v2.27.2
+	github.com/onsi/ginkgo/v2 v2.27.3
 	github.com/onsi/gomega v1.38.2
 )
 
