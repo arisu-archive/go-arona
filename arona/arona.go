@@ -260,12 +260,14 @@ func (c *Client) initialize() *Client {
 func (c *Client) copy() *Client {
 	c.clientMu.Lock()
 	clone := &Client{
-		client:             &http.Client{},
-		publicKey:          c.publicKey,
-		UserAgent:          c.UserAgent,
-		XorEncryptionKey:   c.XorEncryptionKey,
-		ProtocolEncoderURL: c.ProtocolEncoderURL,
-		JSONSerializer:     c.JSONSerializer,
+		client:               &http.Client{},
+		server:               c.server,
+		publicKey:            c.publicKey,
+		UserAgent:            c.UserAgent,
+		XorEncryptionKey:     c.XorEncryptionKey,
+		ProtocolEncoderURL:   c.ProtocolEncoderURL,
+		ProtocolEncoderToken: c.ProtocolEncoderToken,
+		JSONSerializer:       c.JSONSerializer,
 	}
 	c.clientMu.Unlock()
 	// Shallow copy is sufficient since fields are either value types or pointers
