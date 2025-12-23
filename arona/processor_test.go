@@ -89,8 +89,8 @@ var _ = Describe("Processor", func() {
 		})
 
 		It("should process with encryption", func() {
-			aesKey := []byte{}
-			iv := []byte{}
+			aesKey := []byte("0123456789abcdef")
+			iv := []byte("abcdef0123456789")
 
 			body := map[string]any{"key": "value"}
 			key := arona.UserSession{
