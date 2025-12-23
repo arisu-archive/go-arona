@@ -39,7 +39,8 @@ type Client struct {
 	// User agent used when communicating with the game API.
 	UserAgent string
 
-	ProtocolEncoderURL *url.URL // URL of the protocol encoder service.
+	ProtocolEncoderURL   *url.URL // URL of the protocol encoder service.
+	ProtocolEncoderToken string   // Token used for authenticating with the protocol encoder service.
 
 	// PublicKey is the RSA public key used for encrypting sensitive data.
 	publicKey *rsa.PublicKey
@@ -160,12 +161,6 @@ func (rb *RequestBuilder) WithHeaders(headers map[string]string) *RequestBuilder
 	return rb
 }
 
-// WithAuthToken sets the Authorization header with a Bearer token.
-func (rb *RequestBuilder) WithAuthToken(token string) *RequestBuilder {
-	rb.headers["Authorization"] = "Bearer " + token
-	return rb
-}
-
 func (rb *RequestBuilder) Gateway(
 	ctx context.Context,
 	protocol protos.Protocol,
@@ -198,16 +193,14 @@ func (rb *RequestBuilder) Game(
 
 // NewClient returns a new Arona API client. If a nil httpClient is
 // provided, a new http.Client will be used.
-func NewClient(server Server, protocolEncoderURL *url.URL, publicKey *rsa.PublicKey, httpClient *http.Client) *Client {
+func NewClient(publicKey *rsa.PublicKey, httpClient *http.Client) *Client {
 	if httpClient == nil {
 		httpClient = &http.Client{}
 	}
 	httpClient2 := *httpClient
 	c := &Client{
-		client:             &httpClient2,
-		ProtocolEncoderURL: protocolEncoderURL,
-		server:             server,
-		publicKey:          publicKey,
+		client:    &httpClient2,
+		publicKey: publicKey,
 	}
 	return c.initialize()
 }
@@ -220,14 +213,25 @@ func (c *Client) WithServer(server Server) *Client {
 	return c2
 }
 
+func (c *Client) WithEncoder(encoderURL *url.URL, token string) *Client {
+	// Copy a new Client to avoid modifying the original
+	c2 := c.copy()
+	defer c2.initialize()
+	c2.ProtocolEncoderURL = encoderURL
+	c2.ProtocolEncoderToken = token
+	return c2
+}
+
 // initialize sets up the client with default values.
 func (c *Client) initialize() *Client {
 	// Set default URLs based on the server
-	if c.GatewayURL == nil {
-		c.GatewayURL, _ = resolveGatewayURL(c.server)
-	}
-	if c.GameURL == nil {
-		c.GameURL, _ = resolveGameURL(c.server)
+	if c.server != ServerAsia {
+		if c.GatewayURL == nil {
+			c.GatewayURL, _ = resolveGatewayURL(c.server)
+		}
+		if c.GameURL == nil {
+			c.GameURL, _ = resolveGameURL(c.server)
+		}
 	}
 	if c.UserAgent == "" {
 		c.UserAgent = defaultUserAgent
@@ -455,7 +459,8 @@ var ErrInvalidServer = errors.New("invalid server specified")
 type Server int
 
 const (
-	ServerAsia Server = iota
+	ServerUnknown Server = iota
+	ServerAsia
 	ServerTaiwan
 	ServerNorthAmerica
 	ServerEurope

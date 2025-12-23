@@ -36,6 +36,9 @@ func (c *Client) encodeProtocol(ctx context.Context, crc32 uint32, p protos.Prot
 		return 0, fmt.Errorf("failed to create protocol encoder request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if c.ProtocolEncoderToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.ProtocolEncoderToken)
+	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {
