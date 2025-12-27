@@ -39,8 +39,7 @@ type Client struct {
 	// User agent used when communicating with the game API.
 	UserAgent string
 
-	ProtocolEncoderURL   *url.URL // URL of the protocol encoder service.
-	ProtocolEncoderToken string   // Token used for authenticating with the protocol encoder service.
+	ProtocolEncoderConfig *EncoderConfig // Configuration for the protocol encoder service.
 
 	// PublicKey is the RSA public key used for encrypting sensitive data.
 	publicKey *rsa.PublicKey
@@ -213,12 +212,17 @@ func (c *Client) WithServer(server Server) *Client {
 	return c2
 }
 
-func (c *Client) WithEncoder(encoderURL *url.URL, token string) *Client {
+type EncoderConfig struct {
+	URL          *url.URL
+	ClientID     string
+	ClientSecret string
+}
+
+func (c *Client) WithEncoder(cfg *EncoderConfig) *Client {
 	// Copy a new Client to avoid modifying the original
 	c2 := c.copy()
 	defer c2.initialize()
-	c2.ProtocolEncoderURL = encoderURL
-	c2.ProtocolEncoderToken = token
+	c2.ProtocolEncoderConfig = cfg
 	return c2
 }
 
@@ -260,14 +264,13 @@ func (c *Client) initialize() *Client {
 func (c *Client) copy() *Client {
 	c.clientMu.Lock()
 	clone := &Client{
-		client:               &http.Client{},
-		server:               c.server,
-		publicKey:            c.publicKey,
-		UserAgent:            c.UserAgent,
-		XorEncryptionKey:     c.XorEncryptionKey,
-		ProtocolEncoderURL:   c.ProtocolEncoderURL,
-		ProtocolEncoderToken: c.ProtocolEncoderToken,
-		JSONSerializer:       c.JSONSerializer,
+		client:                &http.Client{},
+		server:                c.server,
+		publicKey:             c.publicKey,
+		UserAgent:             c.UserAgent,
+		XorEncryptionKey:      c.XorEncryptionKey,
+		ProtocolEncoderConfig: c.ProtocolEncoderConfig,
+		JSONSerializer:        c.JSONSerializer,
 	}
 	c.clientMu.Unlock()
 	// Shallow copy is sufficient since fields are either value types or pointers
