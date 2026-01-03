@@ -263,8 +263,16 @@ func (c *Client) initialize() *Client {
 
 func (c *Client) copy() *Client {
 	c.clientMu.Lock()
+	// Copy the underlying http.Client value so we preserve configuration
+	// (timeouts, transport, redirect policy, etc.) while still avoiding
+	// accidental mutation of the original pointer.
+	//
+	// Note: this is still a shallow copy of http.Client fields. In particular,
+	// Transport (if set) is an interface value and will be shared, which is OK
+	// and typical for transports.
+	httpClientCopy := *c.client
 	clone := &Client{
-		client:                &http.Client{},
+		client:                &httpClientCopy,
 		server:                c.server,
 		publicKey:             c.publicKey,
 		UserAgent:             c.UserAgent,
