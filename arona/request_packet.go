@@ -1,14 +1,58 @@
 package arona
 
-import "github.com/arisu-archive/arona-protos/protos"
+import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha1" // #nosec G505 -- RSA OAEP with SHA-1 is used by the protocol
+	"fmt"
+	"reflect"
 
-func newRequestPacket(protocol protos.Protocol, requestCount int64, session protos.SessionKey) *protos.RequestPacket {
-	return &protos.RequestPacket{
-		BasePacket: protos.BasePacket{
-			Protocol:   protocol,
-			SessionKey: session,
-			AccountId:  session.AccountServerId,
-		},
-		Hash: requestCount | (int64(protocol) << 32),
+	"github.com/arisu-archive/arona-protos/protos"
+)
+
+type RequestPacketReader interface {
+	Packet() *protos.RequestPacket
+}
+
+type PacketPopulatorOption func(*protos.RequestPacket)
+
+func withSessionKey(session *UserSession) PacketPopulatorOption {
+	return func(packet *protos.RequestPacket) {
+		// Skip if session key is empty
+		if session == nil || reflect.ValueOf(session.SessionKey).IsZero() {
+			return
+		}
+		packet.SessionKey = session.SessionKey
+		packet.AccountId = session.AccountServerId
+		packet.Hash = session.RequestCount | (int64(packet.Protocol) << 32)
 	}
+}
+
+func WithRequestCount(requestCount int64) PacketPopulatorOption {
+	return func(packet *protos.RequestPacket) {
+		packet.Hash = requestCount | (int64(packet.Protocol) << 32)
+	}
+}
+
+func WithHash(hash int64) PacketPopulatorOption {
+	return func(packet *protos.RequestPacket) {
+		packet.Hash = hash
+	}
+}
+
+func (*Client) populate(packet *protos.RequestPacket, protocol protos.Protocol, opts ...PacketPopulatorOption) {
+	packet.Protocol = protocol
+	packet.Hash = 1 | (int64(packet.Protocol) << 32)
+	for _, opt := range opts {
+		opt(packet)
+	}
+}
+
+func rsaEncrypt(data []byte, publicKey *rsa.PublicKey) []byte {
+	// Use RSA OAEP SHA-1 for encryption
+	encryptedData, err := rsa.EncryptOAEP(sha1.New(), rand.Reader, publicKey, data, nil) //nolint:gosec // RSA OAEP with SHA-1 is used by the protocol
+	if err != nil {
+		panic(fmt.Sprintf("RSA encryption failed: %v", err))
+	}
+	return encryptedData
 }

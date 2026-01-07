@@ -6,11 +6,11 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"hash/crc32"
 )
 
-//nolint:gochecknoglobals // CRC32 Table SHOULD be initialized only once. Any other implementation is over-engineering.
 var CRC32Table = crc32.Table{
 	0x00000000, 0x04c11db7, 0x09823b6e, 0x0d4326d9, 0x130476dc, 0x17c56b6b, 0x1a864db2, 0x1e475005,
 	0x2608edb8, 0x22c9f00f, 0x2f8ad6d6, 0x2b4bcb61, 0x350c9b64, 0x31cd86d3, 0x3c8ea00a, 0x384fbdbd,
@@ -57,40 +57,36 @@ func computeHash(data []byte, iv uint32) uint32 {
 
 // Processor handles the cryptographic processing of request payloads.
 type Processor struct {
-	xorKey         byte
-	jsonSerializer JSONSerializer
+	XorKey         byte
+	JSONSerializer JSONSerializer
 }
 
-func encryptPayload(payload []byte, aesKey [16]byte, iv [16]byte) ([]byte, error) {
+func encryptPayload(payload, aesKey, iv []byte) ([]byte, error) {
 	// AES-128-CBC encryption implementation
-	block, err := aes.NewCipher(aesKey[:])
+	block, err := aes.NewCipher(aesKey)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create AES cipher for encryption: %w", err)
 	}
 
 	// PKCS7 Padding
 	paddedPayload := pkcs7Padding(payload, block.BlockSize())
 
 	ciphertext := make([]byte, len(paddedPayload))
-	mode := cipher.NewCBCEncrypter(block, iv[:])
+	mode := cipher.NewCBCEncrypter(block, iv)
 	mode.CryptBlocks(ciphertext, paddedPayload)
 
 	return ciphertext, nil
 }
 
-func decryptPayload(payload []byte, aesKey [16]byte, iv [16]byte) ([]byte, error) {
+func decryptPayload(payload, aesKey, iv []byte) ([]byte, error) {
 	// AES-128-CBC decryption implementation
-	block, err := aes.NewCipher(aesKey[:])
+	block, err := aes.NewCipher(aesKey)
 	if err != nil {
-		return nil, err
-	}
-
-	if len(payload)%block.BlockSize() != 0 {
-		return nil, fmt.Errorf("ciphertext is not a multiple of the block size")
+		return nil, fmt.Errorf("failed to create AES cipher for decryption: %w", err)
 	}
 
 	plaintext := make([]byte, len(payload))
-	mode := cipher.NewCBCDecrypter(block, iv[:])
+	mode := cipher.NewCBCDecrypter(block, iv)
 	mode.CryptBlocks(plaintext, payload)
 
 	// PKCS7 Unpadding
@@ -108,7 +104,7 @@ func pkcs7Padding(ciphertext []byte, blockSize int) []byte {
 	return append(ciphertext, padtext...)
 }
 
-var ErrInvalidPadding = fmt.Errorf("invalid padding")
+var ErrInvalidPadding = errors.New("invalid padding")
 
 func pkcs7Unpadding(origData []byte) ([]byte, error) {
 	length := len(origData)
@@ -135,30 +131,30 @@ func compressPayload(payload []byte) ([]byte, error) {
 	gz := gzip.NewWriter(&buf)
 	_, err := gz.Write(payload)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("gzip write failed: %w", err)
 	}
 	if err = gz.Close(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("gzip close failed: %w", err)
 	}
 	return buf.Bytes(), nil
 }
 
 // Process transforms the body through the full cryptographic pipeline.
-func (p *Processor) Process(body any, key UserSession) ([]byte, error) {
+func (p *Processor) Process(body any, key *UserSession) ([]byte, error) {
 	// Step 1: Serialize to JSON
-	payload, err := p.jsonSerializer.Serialize(body, "")
+	payload, err := p.JSONSerializer.Serialize(body, "")
 	if err != nil {
 		return nil, fmt.Errorf("serialize failed: %w", err)
 	}
 
 	// Step 2: Optional AES encryption
-	if key.AESKey != nil && key.AESIV != nil {
-		payload, err = encryptPayload(payload, *key.AESKey, *key.AESIV)
+	if key != nil && len(key.ClientKeyBundle.Key) > 0 && len(key.ClientKeyBundle.IV) > 0 {
+		payload, err = encryptPayload(payload, key.ClientKeyBundle.Key, key.ClientKeyBundle.IV)
 		if err != nil {
 			return nil, fmt.Errorf("encryption failed: %w", err)
 		}
 	}
-	payloadLength := uint32(len(payload))
+	payloadLength := uint32(len(payload)) //nolint:gosec // This is how the protocol works
 
 	// Step 3: Gzip compression
 	payload, err = compressPayload(payload)
@@ -166,17 +162,17 @@ func (p *Processor) Process(body any, key UserSession) ([]byte, error) {
 		return nil, fmt.Errorf("compression failed: %w", err)
 	}
 
-	// Append the original length (before compression) as 4 bytes little-endian
-	lengthBytes := make([]byte, 4)
+	// Prepend the original length (before compression) as 4 bytes little-endian
+	lengthBytes := make([]byte, 4, 4+len(payload))
 	binary.LittleEndian.PutUint32(lengthBytes, payloadLength)
 	payload = append(lengthBytes, payload...)
 
 	// Step 4: XOR obfuscation
-	return xorPayload(payload, p.xorKey), nil
+	return xorPayload(payload, p.XorKey), nil
 }
 
 // BuildPacket constructs the final packet with protocol header and server keys.
-func (p *Processor) BuildPacket(payload []byte, checksum, encodedProtocol uint32, key UserSession) []byte {
+func (*Processor) BuildPacket(payload []byte, checksum, encodedProtocol uint32, key *UserSession) []byte {
 	var packet bytes.Buffer
 
 	// Payload checksum
@@ -191,10 +187,22 @@ func (p *Processor) BuildPacket(payload []byte, checksum, encodedProtocol uint32
 	packet.Write(protocolHeader)
 
 	// Server key/IV metadata
-	packet.WriteByte(byte(len(key.ServerKey)))
-	packet.WriteByte(byte(len(key.ServerIV)))
-	packet.Write(key.ServerKey)
-	packet.Write(key.ServerIV)
+	keyLen := 0
+	if key != nil {
+		keyLen = len(key.ServerKeyBundle.Key)
+	}
+	ivLen := 0
+	if key != nil {
+		ivLen = len(key.ServerKeyBundle.IV)
+	}
+	packet.WriteByte(byte(keyLen))
+	packet.WriteByte(byte(ivLen))
+	if keyLen > 0 {
+		packet.Write(key.ServerKeyBundle.Key)
+	}
+	if ivLen > 0 {
+		packet.Write(key.ServerKeyBundle.IV)
+	}
 	packet.Write(payload)
 	return packet.Bytes()
 }

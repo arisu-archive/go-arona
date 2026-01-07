@@ -2,20 +2,26 @@ package arona
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/rand"
+	"crypto/rsa"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"mime/multipart"
 	"net/http"
 	"net/url"
 	"sync"
+
+	"github.com/arisu-archive/arona-protos/protos"
 )
 
 const (
-	Version          = "1.82.376243"
+	Version          = "1.82.378581"
 	defaultUserAgent = "BestHTTP/2 v2.4.0"
 	defaultXorKey    = 0xD9
 )
@@ -33,7 +39,12 @@ type Client struct {
 	// User agent used when communicating with the game API.
 	UserAgent string
 
-	Server     Server   // The server to which requests will be sent.
+	ProtocolEncoderConfig *EncoderConfig // Configuration for the protocol encoder service.
+
+	// PublicKey is the RSA public key used for encrypting sensitive data.
+	publicKey *rsa.PublicKey
+
+	server     Server   // The server to which requests will be sent.
 	GatewayURL *url.URL // Base URL for gateway requests. Defaults based on the provided server variable.
 	GameURL    *url.URL // Base URL for game requests. Defaults based on the provided server variable.
 
@@ -41,6 +52,13 @@ type Client struct {
 
 	common service // Reuse a single struct instead of allocating one for each service on the heap.
 	// Services used for talking to different parts of the game API.
+	Account       *AccountService
+	Arena         *ArenaService
+	Clan          *ClanService
+	EliminateRaid *EliminateRaidService
+	Friend        *FriendService
+	Queuing       *QueuingService
+	Raid          *RaidService
 }
 
 // service represents a service for interacting with a specific part of the game API.
@@ -50,10 +68,10 @@ type service struct {
 
 // UserSession holds keys and IVs used for encrypting and forging packets.
 type UserSession struct {
-	AESKey    *[16]byte // Optional AES encryption key
-	AESIV     *[16]byte // Optional AES initialization vector
-	ServerKey []byte    // Server key to include in packet
-	ServerIV  []byte    // Server IV to include in packet
+	protos.SessionKey // Session key information
+	ClientKeyBundle   AESKeyBundle
+	ServerKeyBundle   AESKeyBundle
+	RequestCount      int64
 }
 
 // apiType represents the type of API being accessed.
@@ -64,11 +82,20 @@ const (
 	game
 )
 
+// requestParams groups arguments for newRequest so we don't exceed argument limits.
+type requestParams struct {
+	apiType  apiType
+	protocol protos.Protocol
+	body     RequestPacketReader
+	session  *UserSession
+	headers  map[string]string
+}
+
 // Request represents an API request.
 type Request struct {
 	*http.Request
 	apiType    apiType
-	SessionKey UserSession
+	SessionKey *UserSession
 }
 
 // Response represents an API response.
@@ -84,99 +111,275 @@ type JSONSerializer interface {
 }
 
 // StdJSONSerializer is the default implementation of JSONSerializer using the encoding/json package.
-type defaultJSONSerializer struct{}
+type DefaultJSONSerializer struct{}
 
 // Serialize serializes a value into JSON.
-func (s *defaultJSONSerializer) Serialize(v any, indent string) ([]byte, error) {
+func (*DefaultJSONSerializer) Serialize(v any, indent string) ([]byte, error) {
 	if indent != "" {
-		return json.MarshalIndent(v, "", indent)
+		return json.MarshalIndent(v, "", indent) //nolint:wrapcheck // no need to wrap
 	}
-	return json.Marshal(v)
+	return json.Marshal(v) //nolint:wrapcheck // no need to wrap
 }
 
 // Deserialize deserializes JSON data into a value.
-func (s *defaultJSONSerializer) Deserialize(data []byte, v any) error {
-	return json.Unmarshal(data, v)
+func (*DefaultJSONSerializer) Deserialize(data []byte, v any) error {
+	return json.Unmarshal(data, v) //nolint:wrapcheck // no need to wrap
 }
 
-func (s *defaultJSONSerializer) DeserializeReader(r io.Reader, v any) error {
-	return json.NewDecoder(r).Decode(v)
+func (*DefaultJSONSerializer) DeserializeReader(r io.Reader, v any) error {
+	return json.NewDecoder(r).Decode(v) //nolint:wrapcheck // no need to wrap
 }
 
 type RequestBuilder struct {
 	client  *Client
-	session UserSession
+	session *UserSession
+	headers map[string]string
 }
 
 func (c *Client) R() *RequestBuilder {
 	return &RequestBuilder{
-		client: c,
+		client:  c,
+		headers: make(map[string]string),
 	}
 }
 
-func (rb *RequestBuilder) WithSession(session UserSession) *RequestBuilder {
+func (rb *RequestBuilder) WithSession(session *UserSession) *RequestBuilder {
 	rb.session = session
 	return rb
 }
 
-func (rb *RequestBuilder) Gateway(encodedProtocol uint32, body any) (*Request, error) {
-	return rb.client.newRequest(gateway, encodedProtocol, body, rb.session)
+// WithHeader adds a custom header to the request.
+func (rb *RequestBuilder) WithHeader(key, value string) *RequestBuilder {
+	rb.headers[key] = value
+	return rb
 }
 
-func (rb *RequestBuilder) Game(encodedProtocol uint32, body any) (*Request, error) {
-	return rb.client.newRequest(game, encodedProtocol, body, rb.session)
+// WithHeaders adds multiple custom headers to the request.
+func (rb *RequestBuilder) WithHeaders(headers map[string]string) *RequestBuilder {
+	maps.Copy(rb.headers, headers)
+	return rb
+}
+
+func (rb *RequestBuilder) Gateway(
+	ctx context.Context,
+	protocol protos.Protocol,
+	body RequestPacketReader,
+	opts ...PacketPopulatorOption,
+) (*Request, error) {
+	return rb.client.newRequest(ctx, requestParams{
+		apiType:  gateway,
+		protocol: protocol,
+		body:     body,
+		session:  rb.session,
+		headers:  rb.headers,
+	}, opts...)
+}
+
+func (rb *RequestBuilder) Game(
+	ctx context.Context,
+	protocol protos.Protocol,
+	body RequestPacketReader,
+	opts ...PacketPopulatorOption,
+) (*Request, error) {
+	return rb.client.newRequest(ctx, requestParams{
+		apiType:  game,
+		protocol: protocol,
+		body:     body,
+		session:  rb.session,
+		headers:  rb.headers,
+	}, opts...)
 }
 
 // NewClient returns a new Arona API client. If a nil httpClient is
 // provided, a new http.Client will be used.
-func NewClient(server Server, httpClient *http.Client) *Client {
+func NewClient(publicKey *rsa.PublicKey, httpClient *http.Client) *Client {
 	if httpClient == nil {
 		httpClient = &http.Client{}
 	}
 	httpClient2 := *httpClient
 	c := &Client{
-		client: &httpClient2,
-		Server: server,
+		client:    &httpClient2,
+		publicKey: publicKey,
 	}
 	return c.initialize()
 }
 
-func (c *Client) Do(ctx context.Context, req *Request, v any) (*Response, error) {
+func (c *Client) WithServer(server Server) *Client {
+	// Copy a new Client to avoid modifying the original
+	c2 := c.copy()
+	defer c2.initialize()
+	c2.server = server
+	return c2
+}
+
+type EncoderConfig struct {
+	URL          *url.URL
+	ClientID     string
+	ClientSecret string
+}
+
+func (c *Client) WithEncoder(cfg *EncoderConfig) *Client {
+	// Copy a new Client to avoid modifying the original
+	c2 := c.copy()
+	defer c2.initialize()
+	c2.ProtocolEncoderConfig = cfg
+	return c2
+}
+
+// initialize sets up the client with default values.
+func (c *Client) initialize() *Client {
+	// Set default URLs based on the server
+	if c.server != ServerAsia {
+		if c.GatewayURL == nil {
+			c.GatewayURL, _ = resolveGatewayURL(c.server)
+		}
+		if c.GameURL == nil {
+			c.GameURL, _ = resolveGameURL(c.server)
+		}
+	}
+	if c.UserAgent == "" {
+		c.UserAgent = defaultUserAgent
+	}
+	if c.XorEncryptionKey == 0 {
+		c.XorEncryptionKey = defaultXorKey
+	}
+	if c.JSONSerializer == nil {
+		c.JSONSerializer = &DefaultJSONSerializer{}
+	}
+	c.processor = &Processor{
+		XorKey:         c.XorEncryptionKey,
+		JSONSerializer: c.JSONSerializer,
+	}
+	c.common.client = c
+	c.Account = (*AccountService)(&c.common)
+	c.Arena = (*ArenaService)(&c.common)
+	c.Clan = (*ClanService)(&c.common)
+	c.EliminateRaid = (*EliminateRaidService)(&c.common)
+	c.Friend = (*FriendService)(&c.common)
+	c.Queuing = (*QueuingService)(&c.common)
+	c.Raid = (*RaidService)(&c.common)
+	return c
+}
+
+func (c *Client) copy() *Client {
+	c.clientMu.Lock()
+	// Copy the underlying http.Client value so we preserve configuration
+	// (timeouts, transport, redirect policy, etc.) while still avoiding
+	// accidental mutation of the original pointer.
+	//
+	// Note: this is still a shallow copy of http.Client fields. In particular,
+	// Transport (if set) is an interface value and will be shared, which is OK
+	// and typical for transports.
+	httpClientCopy := *c.client
+	clone := &Client{
+		client:                &httpClientCopy,
+		server:                c.server,
+		publicKey:             c.publicKey,
+		UserAgent:             c.UserAgent,
+		XorEncryptionKey:      c.XorEncryptionKey,
+		ProtocolEncoderConfig: c.ProtocolEncoderConfig,
+		JSONSerializer:        c.JSONSerializer,
+	}
+	c.clientMu.Unlock()
+	// Shallow copy is sufficient since fields are either value types or pointers
+	return clone
+}
+
+func (c *Client) Do(ctx context.Context, req *Request, packet any) (*Response, error) {
 	resp, err := c.bareDo(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	switch v := v.(type) {
-	case nil:
-	case io.Writer:
-		_, err = io.Copy(v, resp.Body)
-	default:
-		decErr := c.JSONSerializer.DeserializeReader(resp.Body, v)
-		if decErr != nil {
-			err = decErr
+	if req.SessionKey != nil {
+		req.SessionKey.RequestCount++
+	}
+
+	var responseData ResponseData
+	response, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+	decErr := c.JSONSerializer.Deserialize(response, &responseData)
+	if errors.Is(decErr, io.EOF) {
+		decErr = nil // ignore EOF errors caused by empty response body
+	}
+	if decErr != nil {
+		return nil, fmt.Errorf("failed to deserialize response data: %w", decErr)
+	}
+
+	// Handle error protocol
+	if responseData.Protocol == "Protocol_Error" {
+		errPacket, err := c.handleErrorPacket(responseData)
+		if err != nil {
+			return nil, err
 		}
+		return nil, c.handleKnownErrorPacket(errPacket)
+	}
+	if err := c.handleResponsePacket(responseData, packet); err != nil {
+		return nil, err
 	}
 	return resp, nil
 }
 
+func (c *Client) handleResponsePacket(responseData ResponseData, packet any) error {
+	if err := c.JSONSerializer.Deserialize([]byte(responseData.Packet), packet); err != nil {
+		return fmt.Errorf("failed to deserialize response packet: %w", err)
+	}
+	return nil
+}
+
+func (*Client) handleKnownErrorPacket(errPacket *protos.ErrorPacket) error {
+	err := NewWebAPIError(errPacket)
+	switch err.Code() {
+	case protos.WebAPIErrorCode_InvalidSession, protos.WebAPIErrorCode_SessionNotFound,
+		protos.WebAPIErrorCode_SessionParseFail, protos.WebAPIErrorCode_SessionInvalidInput,
+		protos.WebAPIErrorCode_SessionNotAuth, protos.WebAPIErrorCode_SessionDuplicateLogin,
+		protos.WebAPIErrorCode_SessionTimeOver, protos.WebAPIErrorCode_SessionInvalidVersion,
+		protos.WebAPIErrorCode_SessionChangeDate:
+		return NewInvalidSessionError("invalid session", err)
+	}
+	return err
+}
+
+func (c *Client) handleErrorPacket(responseData ResponseData) (*protos.ErrorPacket, error) {
+	errorPacket := new(protos.ErrorPacket)
+	if err := c.handleResponsePacket(responseData, errorPacket); err != nil {
+		return nil, fmt.Errorf("failed to handle error packet: %w", err)
+	}
+	return errorPacket, nil
+}
+
 func (c *Client) bareDo(ctx context.Context, req *Request) (*Response, error) {
-	resp, err := c.client.Do(req.WithContext(ctx))
+	resp, err := c.client.Do(req.WithContext(ctx)) //nolint:bodyclose // response body will be handled by caller
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("request failed: %w", err)
 	}
 
-	defer resp.Body.Close()
+	// Determine if gzip uncompression is needed
+	if resp.Header.Get("Content-Encoding") == "gzip" {
+		gzgzipReader, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+		}
+		resp.Body = io.NopCloser(gzgzipReader)
+	}
 
 	// Determine if response should be decrypted based on session keys
 	// If we have server keys, we expect encrypted content that needs decryption
-	if len(req.SessionKey.ServerKey) > 0 && len(req.SessionKey.ServerIV) > 0 {
+	if req.SessionKey != nil && len(req.SessionKey.ServerKeyBundle.Key) > 0 && len(req.SessionKey.ServerKeyBundle.IV) > 0 {
 		// Decrypt the response
 		ciphertext, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("response read failed: %w", err)
 		}
-		decryptedData, err := decryptPayload(ciphertext, *req.SessionKey.AESKey, *req.SessionKey.AESIV)
+
+		// Decode the response payload from base64 string and decrypt it.
+		decodedCiphertext, err := base64.StdEncoding.DecodeString(string(ciphertext))
+		if err != nil {
+			return nil, fmt.Errorf("response base64 decode failed: %w", err)
+		}
+		decryptedData, err := decryptPayload(decodedCiphertext, req.SessionKey.ClientKeyBundle.Key, req.SessionKey.ClientKeyBundle.IV)
 		if err != nil {
 			return nil, fmt.Errorf("response decryption failed: %w", err)
 		}
@@ -190,16 +393,27 @@ func (c *Client) bareDo(ctx context.Context, req *Request) (*Response, error) {
 // newRequest creates a new API request. A relative URL can be provided in urlStr,
 // in which case it is resolved relative to the BaseURL of the Client.
 // Relative URLs should always be specified without a preceding slash.
-func (c *Client) newRequest(apiType apiType, encodedProtocol uint32, body any, key UserSession) (*Request, error) {
+func (c *Client) newRequest(
+	ctx context.Context,
+	params requestParams,
+	opts ...PacketPopulatorOption,
+) (*Request, error) {
+	// Populate packet data
+	opts = append(opts, withSessionKey(params.session))
+	c.populate(params.body.Packet(), params.protocol, opts...)
 	// Process payload through crypto pipeline
-	payload, err := c.processor.Process(body, key)
+	payload, err := c.processor.Process(params.body, params.session)
 	if err != nil {
 		return nil, err
 	}
 	// Encode protocol with checksum
 	checksum := computeHash(payload, 0)
+	encodedProtocol, err := c.encodeProtocol(ctx, checksum, params.protocol)
+	if err != nil {
+		return nil, fmt.Errorf("protocol encoding failed: %w", err)
+	}
 	// Build final packet
-	packetData := c.processor.BuildPacket(payload, checksum, encodedProtocol, key)
+	packetData := c.processor.BuildPacket(payload, checksum, encodedProtocol, params.session)
 	// Create multipart form
 	mw := &multipartWriter{}
 	buf, contentType, err := mw.write(packetData)
@@ -208,34 +422,38 @@ func (c *Client) newRequest(apiType apiType, encodedProtocol uint32, body any, k
 	}
 
 	// Build HTTP request
-	req, err := c.buildHTTPRequest(apiType, buf, contentType)
+	req, err := c.buildHTTPRequest(params.apiType, buf, contentType, params.headers)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Request{
 		Request:    req,
-		apiType:    apiType,
-		SessionKey: key,
+		apiType:    params.apiType,
+		SessionKey: params.session,
 	}, nil
 }
 
 // buildHTTPRequest creates the HTTP request with proper headers.
-func (c *Client) buildHTTPRequest(apiType apiType, body *bytes.Buffer, contentType string) (*http.Request, error) {
+func (c *Client) buildHTTPRequest(apiType apiType, body *bytes.Buffer, contentType string, customHeaders map[string]string) (*http.Request, error) {
 	u, err := c.getBaseURL(apiType).Parse("/api/gateway")
 	if err != nil {
 		return nil, fmt.Errorf("URL parse failed: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", u.String(), body)
+	req, err := http.NewRequest(http.MethodPost, u.String(), body) //nolint:noctx // context will be added in Do method
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("request creation failed: %w", err)
 	}
 
 	req.Header.Set("User-Agent", c.UserAgent)
 	req.Header.Set("Content-Type", contentType)
-	req.Header.Set("mx", "2")
+	req.Header.Set("mx", "2") //nolint:canonicalheader // required by API
 	req.Header.Set("Accept-Encoding", "identity")
+	// Apply custom headers
+	for key, value := range customHeaders {
+		req.Header.Set(key, value)
+	}
 
 	return req, nil
 }
@@ -254,7 +472,8 @@ var ErrInvalidServer = errors.New("invalid server specified")
 type Server int
 
 const (
-	ServerAsia Server = iota
+	ServerUnknown Server = iota
+	ServerAsia
 	ServerTaiwan
 	ServerNorthAmerica
 	ServerEurope
@@ -297,7 +516,11 @@ func resolveGatewayURL(server Server) (*url.URL, error) {
 	if !ok {
 		return nil, ErrInvalidServer
 	}
-	return url.Parse(config.GatewayAPI)
+	u, err := url.Parse(config.GatewayAPI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse gateway URL: %w", err)
+	}
+	return u, nil
 }
 
 // resolveGameURL returns the game URL for the specified server.
@@ -306,53 +529,29 @@ func resolveGameURL(server Server) (*url.URL, error) {
 	if !ok {
 		return nil, ErrInvalidServer
 	}
-	return url.Parse(config.GameAPI)
+	u, err := url.Parse(config.GameAPI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse game URL: %w", err)
+	}
+	return u, nil
 }
 
-// initialize sets up the client with default values.
-func (c *Client) initialize() *Client {
-	// Set default URLs based on the server
-	if c.GatewayURL == nil {
-		c.GatewayURL, _ = resolveGatewayURL(c.Server)
-	}
-	if c.GameURL == nil {
-		c.GameURL, _ = resolveGameURL(c.Server)
-	}
-	if c.UserAgent == "" {
-		c.UserAgent = defaultUserAgent
-	}
-	if c.XorEncryptionKey == 0 {
-		c.XorEncryptionKey = defaultXorKey
-	}
-	if c.JSONSerializer == nil {
-		c.JSONSerializer = &defaultJSONSerializer{}
-	}
-	c.processor = &Processor{
-		xorKey:         c.XorEncryptionKey,
-		jsonSerializer: c.JSONSerializer,
-	}
-	c.common.client = c
-	return c
-}
+type multipartWriter struct{}
 
-type multipartWriter struct {
-	boundary string
-}
-
-func (mw *multipartWriter) write(packetData []byte) (*bytes.Buffer, string, error) {
+func (*multipartWriter) write(packetData []byte) (*bytes.Buffer, string, error) {
 	buf := &bytes.Buffer{}
 	writer := multipart.NewWriter(buf)
-	writer.SetBoundary(fmt.Sprintf("BestHTTP_HTTPMultiPartForm_%s", randomBoundary()))
+	writer.SetBoundary(fmt.Sprintf("BestHTTP_HTTPMultiPartForm_%s", randomBoundary())) //nolint:errcheck // cannot fail
 
 	part, err := writer.CreateFormFile("mx", "mx.dat")
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("form file creation failed: %w", err)
 	}
 	if _, err := part.Write(packetData); err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("form file write failed: %w", err)
 	}
 	if err := writer.Close(); err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("multipart writer close failed: %w", err)
 	}
 	return buf, writer.FormDataContentType(), nil
 }
