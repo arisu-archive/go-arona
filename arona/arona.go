@@ -207,8 +207,8 @@ func NewClient(publicKey *rsa.PublicKey, httpClient *http.Client) *Client {
 func (c *Client) WithServer(server Server) *Client {
 	// Copy a new Client to avoid modifying the original
 	c2 := c.copy()
-	defer c2.initialize()
 	c2.server = server
+	c2.initialize()
 	return c2
 }
 
@@ -221,15 +221,15 @@ type EncoderConfig struct {
 func (c *Client) WithEncoder(cfg *EncoderConfig) *Client {
 	// Copy a new Client to avoid modifying the original
 	c2 := c.copy()
-	defer c2.initialize()
 	c2.ProtocolEncoderConfig = cfg
+	c2.initialize()
 	return c2
 }
 
 // initialize sets up the client with default values.
 func (c *Client) initialize() *Client {
 	// Set default URLs based on the server
-	if c.server != ServerAsia {
+	if c.server != ServerUnknown {
 		if c.GatewayURL == nil {
 			c.GatewayURL, _ = resolveGatewayURL(c.server)
 		}
