@@ -2,8 +2,8 @@ github.com/Masterminds/semver/v3 v3.4.0 h1:Zog+i5UMtVoCU8oKka5P7i9q9HgrJeGzI9SA1
 github.com/Masterminds/semver/v3 v3.4.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lprf4nC11bSS5beM=
 github.com/arisu-archive/arona-flatbuffers v0.4.0 h1:ovRw57cDc+0g2fBTjdL+4q1u8mAi/4MZZnzJ07HsXh4=
 github.com/arisu-archive/arona-flatbuffers v0.4.0/go.mod h1:s5gZf8zMdc+DKt95dgH8EUxl+L55bxnAsiazbiE2l9s=
-github.com/arisu-archive/arona-protos v1.0.0 h1:/W3X7OfguOFZNrJTQt/L/4NRpQL7eEnLmqm6ysKwXms=
-github.com/arisu-archive/arona-protos v1.0.0/go.mod h1:/CHBaLFMJI8hVsLhBHtsJWcJ3befTfSbuGvCLoIXfw0=
+github.com/arisu-archive/arona-protos v1.0.1 h1:07wNIxdRX8sWbwMgct5QIm9AHM33rboP3d3FlzG4xXc=
+github.com/arisu-archive/arona-protos v1.0.1/go.mod h1:/CHBaLFMJI8hVsLhBHtsJWcJ3befTfSbuGvCLoIXfw0=
 github.com/arisu-archive/bluearchive-fbs-utils v0.0.0-20251204154751-651482551f83 h1:MHtBId/Qdcmt+dLY2uiHxOMxRzi4u1jnq4IxcD7ii4E=
 github.com/arisu-archive/bluearchive-fbs-utils v0.0.0-20251204154751-651482551f83/go.mod h1:vOvsaBDrAONVArYo9bI/kX+GBw75mRP+J3RDeG9F3SM=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
