@@ -309,7 +309,7 @@ func (c *Client) Do(ctx context.Context, req *Request, packet any) (*Response, e
 	}
 
 	// Handle error protocol
-	if responseData.Protocol == "Protocol_Error" {
+	if responseData.Protocol == "Error" {
 		errPacket, err := c.handleErrorPacket(responseData)
 		if err != nil {
 			return nil, err
@@ -336,7 +336,7 @@ func (*Client) handleKnownErrorPacket(errPacket *protos.ErrorPacket) error {
 		protos.WebAPIErrorCode_SessionParseFail, protos.WebAPIErrorCode_SessionInvalidInput,
 		protos.WebAPIErrorCode_SessionNotAuth, protos.WebAPIErrorCode_SessionDuplicateLogin,
 		protos.WebAPIErrorCode_SessionTimeOver, protos.WebAPIErrorCode_SessionInvalidVersion,
-		protos.WebAPIErrorCode_SessionChangeDate:
+		protos.WebAPIErrorCode_SessionChangeDate, protos.WebAPIErrorCode_NexonNgsmValidateFail:
 		return NewInvalidSessionError("invalid session", err)
 	}
 	return err
