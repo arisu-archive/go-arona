@@ -5,7 +5,7 @@ go 1.25.0
 toolchain go1.25.5
 
 require (
-	github.com/arisu-archive/arona-flatbuffers v0.4.0
+	github.com/arisu-archive/arona-flatbuffers v0.5.0
 	github.com/arisu-archive/arona-protos v1.0.1
 	github.com/google/uuid v1.6.0
 	github.com/onsi/ginkgo/v2 v2.27.3
