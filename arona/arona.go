@@ -68,10 +68,10 @@ type service struct {
 
 // UserSession holds keys and IVs used for encrypting and forging packets.
 type UserSession struct {
-	protos.SessionKey // Session key information
-	ClientKeyBundle   AESKeyBundle
-	ServerKeyBundle   AESKeyBundle
-	RequestCount      int64
+	*protos.SessionKey // Session key information
+	ClientKeyBundle    AESKeyBundle
+	ServerKeyBundle    AESKeyBundle
+	RequestCount       int64
 }
 
 // apiType represents the type of API being accessed.
@@ -247,6 +247,7 @@ func (c *Client) initialize() *Client {
 		c.JSONSerializer = &DefaultJSONSerializer{}
 	}
 	c.processor = &Processor{
+		PublicKey:      c.publicKey,
 		XorKey:         c.XorEncryptionKey,
 		JSONSerializer: c.JSONSerializer,
 	}
@@ -402,7 +403,7 @@ func (c *Client) newRequest(
 	opts = append(opts, withSessionKey(params.session))
 	c.populate(params.body.Packet(), params.protocol, opts...)
 	// Process payload through crypto pipeline
-	payload, err := c.processor.Process(params.body, params.session)
+	payload, err := c.processor.Process(params.body, params.session, false)
 	if err != nil {
 		return nil, err
 	}
