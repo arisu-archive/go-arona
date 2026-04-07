@@ -5,7 +5,7 @@ go 1.25.0
 toolchain go1.26.1
 
 require (
-	github.com/arisu-archive/arona-flatbuffers v0.6.0
+	github.com/arisu-archive/arona-flatbuffers v0.7.1
 	github.com/arisu-archive/arona-protos v1.0.2
 	github.com/google/uuid v1.6.0
 	github.com/onsi/ginkgo/v2 v2.27.3
@@ -14,7 +14,7 @@ require (
 
 require (
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
-	github.com/arisu-archive/bluearchive-fbs-utils v0.0.0-20251204154751-651482551f83 // indirect
+	github.com/arisu-archive/bluearchive-fbs-utils v0.0.0-20260406083956-7eadd04b03be // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/google/flatbuffers v25.12.19+incompatible // indirect
