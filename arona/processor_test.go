@@ -67,7 +67,7 @@ var _ = Describe("Processor", func() {
 			body := map[string]any{"key": "value"}
 			key := arona.UserSession{}
 
-			result, err := processor.Process(body, &key)
+			result, err := processor.Process(body, &key, true)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).NotTo(BeEmpty())
 
@@ -100,7 +100,7 @@ var _ = Describe("Processor", func() {
 				},
 			}
 
-			result, err := processor.Process(body, &key)
+			result, err := processor.Process(body, &key, true)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).NotTo(BeEmpty())
 
@@ -139,10 +139,10 @@ var _ = Describe("Processor", func() {
 			body2 := map[string]any{"key": "value2"}
 			key := arona.UserSession{}
 
-			result1, err1 := processor.Process(body1, &key)
+			result1, err1 := processor.Process(body1, &key, true)
 			Expect(err1).NotTo(HaveOccurred())
 
-			result2, err2 := processor.Process(body2, &key)
+			result2, err2 := processor.Process(body2, &key, true)
 			Expect(err2).NotTo(HaveOccurred())
 
 			Expect(result1).NotTo(Equal(result2))
@@ -152,10 +152,10 @@ var _ = Describe("Processor", func() {
 			body := map[string]any{"key": "value"}
 			key := arona.UserSession{}
 
-			result1, err1 := processor.Process(body, &key)
+			result1, err1 := processor.Process(body, &key, true)
 			Expect(err1).NotTo(HaveOccurred())
 
-			result2, err2 := processor.Process(body, &key)
+			result2, err2 := processor.Process(body, &key, true)
 			Expect(err2).NotTo(HaveOccurred())
 
 			Expect(result1).To(Equal(result2))
@@ -165,7 +165,7 @@ var _ = Describe("Processor", func() {
 			body := map[string]any{}
 			key := arona.UserSession{}
 
-			result, err := processor.Process(body, &key)
+			result, err := processor.Process(body, &key, true)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result).NotTo(BeEmpty())
 		})

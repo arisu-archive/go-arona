@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/rsa"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -57,6 +58,7 @@ func computeHash(data []byte, iv uint32) uint32 {
 
 // Processor handles the cryptographic processing of request payloads.
 type Processor struct {
+	PublicKey      *rsa.PublicKey
 	XorKey         byte
 	JSONSerializer JSONSerializer
 }
@@ -140,7 +142,7 @@ func compressPayload(payload []byte) ([]byte, error) {
 }
 
 // Process transforms the body through the full cryptographic pipeline.
-func (p *Processor) Process(body any, key *UserSession) ([]byte, error) {
+func (p *Processor) Process(body any, key *UserSession, isGatewayBypassed bool) ([]byte, error) {
 	// Step 1: Serialize to JSON
 	payload, err := p.JSONSerializer.Serialize(body, "")
 	if err != nil {
@@ -152,6 +154,11 @@ func (p *Processor) Process(body any, key *UserSession) ([]byte, error) {
 		payload, err = encryptPayload(payload, key.ClientKeyBundle.Key, key.ClientKeyBundle.IV)
 		if err != nil {
 			return nil, fmt.Errorf("encryption failed: %w", err)
+		}
+	} else if !isGatewayBypassed {
+		// If no public key is configured, we can't RSA-encrypt; leave payload as-is.
+		if p.PublicKey != nil {
+			payload = rsaEncrypt(payload, p.PublicKey)
 		}
 	}
 	payloadLength := uint32(len(payload)) //nolint:gosec // This is how the protocol works
