@@ -114,7 +114,7 @@ func (s *AccountService) CheckNexon(
 			ClientGeneratedIV:  base64.StdEncoding.EncodeToString(rsaEncrypt(ops.KeyBundle.IV, s.client.publicKey)),
 		},
 	}
-	req, err := s.client.R().Game(ctx, protos.Protocol_Account_CheckNexon, param)
+	req, err := s.client.R().WithGatewayBypass().Game(ctx, protos.Protocol_Account_CheckNexon, param)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create check nexon request: %w", err)
 	}

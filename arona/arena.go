@@ -19,6 +19,7 @@ func (w ArenaRankListRequestWrapper) Packet() *protos.RequestPacket {
 
 func (s *ArenaService) GetRanks(
 	ctx context.Context,
+	session *UserSession,
 	rank int32,
 	count int32,
 ) (*protos.ArenaRankListResponse, error) {
@@ -28,7 +29,7 @@ func (s *ArenaService) GetRanks(
 			Count:      count,
 		},
 	}
-	req, err := s.client.R().Game(ctx, protos.Protocol_Arena_RankList, param)
+	req, err := s.client.R().WithSession(session).Game(ctx, protos.Protocol_Arena_RankList, param)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create arena rank list request: %w", err)
 	}

@@ -84,11 +84,12 @@ const (
 
 // requestParams groups arguments for newRequest so we don't exceed argument limits.
 type requestParams struct {
-	apiType  apiType
-	protocol protos.Protocol
-	body     RequestPacketReader
-	session  *UserSession
-	headers  map[string]string
+	apiType       apiType
+	protocol      protos.Protocol
+	body          RequestPacketReader
+	session       *UserSession
+	headers       map[string]string
+	gatewayBypass bool
 }
 
 // Request represents an API request.
@@ -131,9 +132,10 @@ func (*DefaultJSONSerializer) DeserializeReader(r io.Reader, v any) error {
 }
 
 type RequestBuilder struct {
-	client  *Client
-	session *UserSession
-	headers map[string]string
+	client        *Client
+	session       *UserSession
+	headers       map[string]string
+	gatewayBypass bool
 }
 
 func (c *Client) R() *RequestBuilder {
@@ -160,6 +162,11 @@ func (rb *RequestBuilder) WithHeaders(headers map[string]string) *RequestBuilder
 	return rb
 }
 
+func (rb *RequestBuilder) WithGatewayBypass() *RequestBuilder {
+	rb.gatewayBypass = true
+	return rb
+}
+
 func (rb *RequestBuilder) Gateway(
 	ctx context.Context,
 	protocol protos.Protocol,
@@ -167,11 +174,12 @@ func (rb *RequestBuilder) Gateway(
 	opts ...PacketPopulatorOption,
 ) (*Request, error) {
 	return rb.client.newRequest(ctx, requestParams{
-		apiType:  gateway,
-		protocol: protocol,
-		body:     body,
-		session:  rb.session,
-		headers:  rb.headers,
+		apiType:       gateway,
+		protocol:      protocol,
+		body:          body,
+		session:       rb.session,
+		headers:       rb.headers,
+		gatewayBypass: rb.gatewayBypass,
 	}, opts...)
 }
 
@@ -182,11 +190,12 @@ func (rb *RequestBuilder) Game(
 	opts ...PacketPopulatorOption,
 ) (*Request, error) {
 	return rb.client.newRequest(ctx, requestParams{
-		apiType:  game,
-		protocol: protocol,
-		body:     body,
-		session:  rb.session,
-		headers:  rb.headers,
+		apiType:       game,
+		protocol:      protocol,
+		body:          body,
+		session:       rb.session,
+		headers:       rb.headers,
+		gatewayBypass: rb.gatewayBypass,
 	}, opts...)
 }
 
@@ -403,7 +412,7 @@ func (c *Client) newRequest(
 	opts = append(opts, withSessionKey(params.session))
 	c.populate(params.body.Packet(), params.protocol, opts...)
 	// Process payload through crypto pipeline
-	payload, err := c.processor.Process(params.body, params.session, false)
+	payload, err := c.processor.Process(params.body, params.session, params.gatewayBypass)
 	if err != nil {
 		return nil, err
 	}

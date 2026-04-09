@@ -29,12 +29,7 @@ func (s *QueuingService) GetCryptoKeys(ctx context.Context, data GetCryptoKeysOp
 			ClientGeneratedIV:  base64.StdEncoding.EncodeToString(data.KeyBundle.IV),
 		},
 	}
-	req, err := s.client.R().Gateway(
-		ctx,
-		protos.Protocol_Queuing_GetCryptoKeys,
-		param,
-		WithHash(0),
-	)
+	req, err := s.client.R().Gateway(ctx, protos.Protocol_Queuing_GetCryptoKeys, param, WithHash(0))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create get crypto keys request: %w", err)
 	}
@@ -74,7 +69,7 @@ func (s *QueuingService) GetTicket(ctx context.Context, data GetTicketOptions) (
 			AccessIP:      defaultAccessIP,
 		},
 	}
-	req, err := s.client.R().Gateway(ctx, protos.Protocol_Queuing_GetTicket, param, WithHash(0))
+	req, err := s.client.R().WithGatewayBypass().Gateway(ctx, protos.Protocol_Queuing_GetTicket, param, WithHash(0))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create get ticket request: %w", err)
 	}
