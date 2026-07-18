@@ -36,6 +36,60 @@ func (c *CafeService) Interact(ctx context.Context, session *UserSession, cafeID
 	return result, nil
 }
 
+type CafeSummonCharacterRequestWrapper struct {
+	*protos.CafeSummonCharacterRequest
+}
+
+func (w CafeSummonCharacterRequestWrapper) Packet() *protos.RequestPacket {
+	return &w.RequestPacket
+}
+
+func (c *CafeService) Summon(ctx context.Context, session *UserSession, cafeID, characterServerID int64) (*protos.CafeSummonCharacterResponse, error) {
+	param := CafeSummonCharacterRequestWrapper{
+		&protos.CafeSummonCharacterRequest{
+			CafeDBId:          cafeID,
+			CharacterServerId: characterServerID,
+		},
+	}
+	req, err := c.client.R().WithSession(session).Game(ctx, protos.Protocol_Cafe_SummonCharacter, param)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create get cafe info request: %w", err)
+	}
+	result := new(protos.CafeSummonCharacterResponse)
+	_, err = c.client.Do(ctx, req, result)
+	if err != nil {
+		return nil, fmt.Errorf("get cafe info request failed: %w", err)
+	}
+	return result, nil
+}
+
+type CafeSummonCharacterTicketUseRequestWrapper struct {
+	*protos.CafeSummonCharacterTicketUseRequest
+}
+
+func (w CafeSummonCharacterTicketUseRequestWrapper) Packet() *protos.RequestPacket {
+	return &w.RequestPacket
+}
+
+func (c *CafeService) SummonByTicket(ctx context.Context, session *UserSession, cafeID, characterServerID int64) (*protos.CafeSummonCharacterTicketUseResponse, error) {
+	param := CafeSummonCharacterTicketUseRequestWrapper{
+		&protos.CafeSummonCharacterTicketUseRequest{
+			CafeDBId:          cafeID,
+			CharacterServerId: characterServerID,
+		},
+	}
+	req, err := c.client.R().WithSession(session).Game(ctx, protos.Protocol_Cafe_SummonCharacterTicketUse, param)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create get cafe info request: %w", err)
+	}
+	result := new(protos.CafeSummonCharacterTicketUseResponse)
+	_, err = c.client.Do(ctx, req, result)
+	if err != nil {
+		return nil, fmt.Errorf("get cafe info request failed: %w", err)
+	}
+	return result, nil
+}
+
 type CafeGetInfoRequestWrapper struct {
 	*protos.CafeGetInfoRequest
 }
