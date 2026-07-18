@@ -59,6 +59,7 @@ type Client struct {
 	Friend        *FriendService
 	Queuing       *QueuingService
 	Raid          *RaidService
+	Shop          *ShopService
 }
 
 // service represents a service for interacting with a specific part of the game API.
@@ -268,6 +269,7 @@ func (c *Client) initialize() *Client {
 	c.Friend = (*FriendService)(&c.common)
 	c.Queuing = (*QueuingService)(&c.common)
 	c.Raid = (*RaidService)(&c.common)
+	c.Shop = (*ShopService)(&c.common)
 	return c
 }
 
