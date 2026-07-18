@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.0](https://github.com/arisu-archive/go-arona/compare/v1.3.0...v1.4.0) (2026-07-18)
+
+
+### Features
+
+* add summon character  functionality ([52a9f66](https://github.com/arisu-archive/go-arona/commit/52a9f66ce4da83aed29e9f4b3dca7e16fd1eda04))
+* **arena:** add daily and cumulative time reward functionalities ([34a16dc](https://github.com/arisu-archive/go-arona/commit/34a16dc1327830405f9e03ffdbec70ff9cf7c654))
+* **friend:** add bulk retrieval function ([b29fe26](https://github.com/arisu-archive/go-arona/commit/b29fe267c2b908f2f2ca31dc7a3513ba86e4e070))
+* **shop:** implement merchandise purchasing functionality ([2f559a7](https://github.com/arisu-archive/go-arona/commit/2f559a7794f1f6a6d17bbdf3518f70451bdc977c))
+
 ## [1.3.0](https://github.com/arisu-archive/go-arona/compare/v1.2.0...v1.3.0) (2026-07-17)
 
 
