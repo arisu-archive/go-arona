@@ -40,3 +40,51 @@ func (s *ArenaService) GetRanks(
 	}
 	return result, nil
 }
+
+type ArenaDailyRewardRequestWrapper struct {
+	*protos.ArenaDailyRewardRequest
+}
+
+func (w ArenaDailyRewardRequestWrapper) Packet() *protos.RequestPacket {
+	return &w.RequestPacket
+}
+
+func (s *ArenaService) DailyReward(ctx context.Context, session *UserSession) (*protos.ArenaDailyRewardResponse, error) {
+	param := ArenaDailyRewardRequestWrapper{
+		ArenaDailyRewardRequest: &protos.ArenaDailyRewardRequest{},
+	}
+	req, err := s.client.R().WithSession(session).Game(ctx, protos.Protocol_Arena_DailyReward, param)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create arena daily reward request: %w", err)
+	}
+	result := new(protos.ArenaDailyRewardResponse)
+	_, err = s.client.Do(ctx, req, result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get arena daily reward response: %w", err)
+	}
+	return result, nil
+}
+
+type ArenaCumulativeTimeRewardRequestWrapper struct {
+	*protos.ArenaCumulativeTimeRewardRequest
+}
+
+func (w ArenaCumulativeTimeRewardRequestWrapper) Packet() *protos.RequestPacket {
+	return &w.RequestPacket
+}
+
+func (s *ArenaService) CumulativeTimeReward(ctx context.Context, session *UserSession) (*protos.ArenaCumulativeTimeRewardResponse, error) {
+	param := ArenaCumulativeTimeRewardRequestWrapper{
+		ArenaCumulativeTimeRewardRequest: &protos.ArenaCumulativeTimeRewardRequest{},
+	}
+	req, err := s.client.R().WithSession(session).Game(ctx, protos.Protocol_Arena_CumulativeTimeReward, param)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create arena cumulative time reward request: %w", err)
+	}
+	result := new(protos.ArenaCumulativeTimeRewardResponse)
+	_, err = s.client.Do(ctx, req, result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get arena cumulative time reward response: %w", err)
+	}
+	return result, nil
+}
