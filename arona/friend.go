@@ -36,6 +36,32 @@ func (s *FriendService) GetDetail(ctx context.Context, session *UserSession, acc
 	return result, nil
 }
 
+type FriendListByIdsRequestWrapper struct {
+	*protos.FriendListByIdsRequest
+}
+
+func (w FriendListByIdsRequestWrapper) Packet() *protos.RequestPacket {
+	return &w.RequestPacket
+}
+
+func (s *FriendService) BulkGet(ctx context.Context, session *UserSession, accountID []int64) (*protos.FriendListByIdsResponse, error) {
+	param := FriendListByIdsRequestWrapper{
+		&protos.FriendListByIdsRequest{
+			TargetAccountIds: accountID,
+		},
+	}
+	req, err := s.client.R().WithSession(session).Game(ctx, protos.Protocol_Friend_ListByIds, param)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create get friend detail request: %w", err)
+	}
+	result := new(protos.FriendListByIdsResponse)
+	_, err = s.client.Do(ctx, req, result)
+	if err != nil {
+		return nil, fmt.Errorf("get friend detail request failed: %w", err)
+	}
+	return result, nil
+}
+
 type FriendSearchRequestWrapper struct {
 	*protos.FriendSearchRequest
 }
