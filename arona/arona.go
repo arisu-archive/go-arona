@@ -15,6 +15,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"strconv"
 	"sync"
 
 	"github.com/arisu-archive/arona-protos/protos"
@@ -461,6 +462,9 @@ func (c *Client) buildHTTPRequest(apiType apiType, body *bytes.Buffer, contentTy
 	req.Header.Set("User-Agent", c.UserAgent)
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("mx", "2") //nolint:canonicalheader // required by API
+	if c.publicKey != nil {
+		req.Header.Set("ks", strconv.FormatInt(int64(c.publicKey.N.BitLen()), 10)) //nolint:canonicalheader // required by API
+	}
 	req.Header.Set("Accept-Encoding", "identity")
 	// Apply custom headers
 	for key, value := range customHeaders {

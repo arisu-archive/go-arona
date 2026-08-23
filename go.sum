@@ -2,8 +2,14 @@ github.com/Masterminds/semver/v3 v3.4.0 h1:Zog+i5UMtVoCU8oKka5P7i9q9HgrJeGzI9SA1
 github.com/Masterminds/semver/v3 v3.4.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lprf4nC11bSS5beM=
 github.com/arisu-archive/arona-flatbuffers v0.8.1 h1:q1VlVRKJJK73SKmW6/s60ks35ayM38BbHNJ7n7fjNK4=
 github.com/arisu-archive/arona-flatbuffers v0.8.1/go.mod h1:kYLvMerNFqiYAtEhYYq2hzl2UJmr8mNvMkfxDpLtZ6w=
+github.com/arisu-archive/arona-flatbuffers v0.10.0 h1:hG84sP1motIIm6Zc0hyRpqZa8gRIRJoNzMu3aI/3qdc=
+github.com/arisu-archive/arona-flatbuffers v0.10.0/go.mod h1:kYLvMerNFqiYAtEhYYq2hzl2UJmr8mNvMkfxDpLtZ6w=
 github.com/arisu-archive/arona-protos v1.5.0 h1:uCPbYspBdbh09ODEXksnC33jO3zIQOwOyXJNrLn/x7o=
 github.com/arisu-archive/arona-protos v1.5.0/go.mod h1:mAXKWLWPzuG2XKbP7hvEyIee6fHtl2X0JxeDzIgKhkg=
+github.com/arisu-archive/arona-protos v1.6.0 h1:FZeUBA6pj96pwQ8Z831VOSVyWxn0g9Zdrwa4Wj1GPZY=
+github.com/arisu-archive/arona-protos v1.6.0/go.mod h1:hPVmy9/xkdFT0JyI/u+UKKcF+9Cb1CSXIowJts4vmjg=
+github.com/arisu-archive/arona-protos v1.7.0 h1:D3LnvlYTwNa9Y/VHDAALHjhCss9dIUNjGqGkLVsjuH0=
+github.com/arisu-archive/arona-protos v1.7.0/go.mod h1:3sHWG96k35hZ6v7Qj1dk5bcvwChEaq67U9zj5DBXqoQ=
 github.com/arisu-archive/bluearchive-fbs-utils v0.0.0-20260501232406-c0b3ccdb8eaa h1:g9JIeO1WB0oyfbmvADNtJgYsFqnm1HkT53qwn6/klak=
 github.com/arisu-archive/bluearchive-fbs-utils v0.0.0-20260501232406-c0b3ccdb8eaa/go.mod h1:xVV8J56yx9gEu5a4x/zDMWpYyHuaoKT1pGoVA1za5X8=
 github.com/arisu-archive/mapx v1.1.0 h1:P64Cm983i6WhGPiy9m/zHRys08/MRpvwdy/eRgDxoQ8=
