@@ -29,7 +29,7 @@ func (c *CafeService) Interact(ctx context.Context, session *UserSession, cafeID
 		return nil, fmt.Errorf("failed to create get friend detail request: %w", err)
 	}
 	result := new(protos.CafeInteractWithCharacterResponse)
-	_, err = c.client.Do(ctx, req, result)
+	_, err = c.client.Do(req, result)
 	if err != nil {
 		return nil, fmt.Errorf("get friend detail request failed: %w", err)
 	}
@@ -56,7 +56,7 @@ func (c *CafeService) Summon(ctx context.Context, session *UserSession, cafeID, 
 		return nil, fmt.Errorf("failed to create get cafe info request: %w", err)
 	}
 	result := new(protos.CafeSummonCharacterResponse)
-	_, err = c.client.Do(ctx, req, result)
+	_, err = c.client.Do(req, result)
 	if err != nil {
 		return nil, fmt.Errorf("get cafe info request failed: %w", err)
 	}
@@ -83,7 +83,7 @@ func (c *CafeService) SummonByTicket(ctx context.Context, session *UserSession, 
 		return nil, fmt.Errorf("failed to create get cafe info request: %w", err)
 	}
 	result := new(protos.CafeSummonCharacterTicketUseResponse)
-	_, err = c.client.Do(ctx, req, result)
+	_, err = c.client.Do(req, result)
 	if err != nil {
 		return nil, fmt.Errorf("get cafe info request failed: %w", err)
 	}
@@ -109,7 +109,7 @@ func (c *CafeService) GetInfo(ctx context.Context, session *UserSession) (*proto
 		return nil, fmt.Errorf("failed to create get cafe info request: %w", err)
 	}
 	result := new(protos.CafeGetInfoResponse)
-	_, err = c.client.Do(ctx, req, result)
+	_, err = c.client.Do(req, result)
 	if err != nil {
 		return nil, fmt.Errorf("get cafe info request failed: %w", err)
 	}

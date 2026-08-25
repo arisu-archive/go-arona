@@ -34,7 +34,7 @@ func (s *QueuingService) GetCryptoKeys(ctx context.Context, data GetCryptoKeysOp
 		return nil, fmt.Errorf("failed to create get crypto keys request: %w", err)
 	}
 	result := new(protos.QueuingGetCryptoKeysResponse)
-	_, err = s.client.Do(ctx, req, result)
+	_, err = s.client.Do(req, result)
 	if err != nil {
 		return nil, fmt.Errorf("get crypto keys request failed: %w", err)
 	}
@@ -74,7 +74,7 @@ func (s *QueuingService) GetTicket(ctx context.Context, data GetTicketOptions) (
 		return nil, fmt.Errorf("failed to create get ticket request: %w", err)
 	}
 	result := new(protos.QueuingGetTicketResponse)
-	_, err = s.client.Do(ctx, req, result)
+	_, err = s.client.Do(req, result)
 	if err != nil {
 		return nil, fmt.Errorf("get ticket request failed: %w", err)
 	}

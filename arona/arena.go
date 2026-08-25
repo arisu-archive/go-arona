@@ -34,7 +34,7 @@ func (s *ArenaService) GetRanks(
 		return nil, fmt.Errorf("failed to create arena rank list request: %w", err)
 	}
 	result := new(protos.ArenaRankListResponse)
-	_, err = s.client.Do(ctx, req, result)
+	_, err = s.client.Do(req, result)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get arena rank list response: %w", err)
 	}
@@ -58,7 +58,7 @@ func (s *ArenaService) DailyReward(ctx context.Context, session *UserSession) (*
 		return nil, fmt.Errorf("failed to create arena daily reward request: %w", err)
 	}
 	result := new(protos.ArenaDailyRewardResponse)
-	_, err = s.client.Do(ctx, req, result)
+	_, err = s.client.Do(req, result)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get arena daily reward response: %w", err)
 	}
@@ -82,7 +82,7 @@ func (s *ArenaService) CumulativeTimeReward(ctx context.Context, session *UserSe
 		return nil, fmt.Errorf("failed to create arena cumulative time reward request: %w", err)
 	}
 	result := new(protos.ArenaCumulativeTimeRewardResponse)
-	_, err = s.client.Do(ctx, req, result)
+	_, err = s.client.Do(req, result)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get arena cumulative time reward response: %w", err)
 	}

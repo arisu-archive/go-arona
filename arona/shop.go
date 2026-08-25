@@ -38,7 +38,7 @@ func (s *ShopService) BuyMerchandise(ctx context.Context, session *UserSession, 
 		return nil, fmt.Errorf("failed to create get cafe info request: %w", err)
 	}
 	result := new(protos.ShopBuyMerchandiseResponse)
-	_, err = s.client.Do(ctx, req, result)
+	_, err = s.client.Do(req, result)
 	if err != nil {
 		return nil, fmt.Errorf("get cafe info request failed: %w", err)
 	}

@@ -74,7 +74,7 @@ func (s *AccountService) Authenticate(
 		return nil, fmt.Errorf("failed to create authenticate request: %w", err)
 	}
 	result := new(protos.AccountAuthResponse)
-	_, err = s.client.Do(ctx, req, result)
+	_, err = s.client.Do(req, result)
 	if err != nil {
 		return nil, fmt.Errorf("authenticate request failed: %w", err)
 	}
@@ -119,7 +119,7 @@ func (s *AccountService) CheckNexon(
 		return nil, fmt.Errorf("failed to create check nexon request: %w", err)
 	}
 	result := new(protos.AccountCheckNexonResponse)
-	_, err = s.client.Do(ctx, req, result)
+	_, err = s.client.Do(req, result)
 	if err != nil {
 		return nil, fmt.Errorf("check nexon request failed: %w", err)
 	}
