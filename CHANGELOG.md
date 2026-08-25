@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.0](https://github.com/arisu-archive/go-arona/compare/v1.4.0...v1.5.0) (2026-08-25)
+
+
+### Features
+
+* replace protocol encoder implementation ([eb9bab1](https://github.com/arisu-archive/go-arona/commit/eb9bab1892dc5728231b3a5033340b1063f8969c))
+
+
+### Continuous Integration
+
+* setup workflow for testing ([#31](https://github.com/arisu-archive/go-arona/issues/31)) ([35a6e59](https://github.com/arisu-archive/go-arona/commit/35a6e599fdd27055895c661487c9953712413e1f))
+
 ## [1.4.0](https://github.com/arisu-archive/go-arona/compare/v1.3.0...v1.4.0) (2026-08-23)
 
 
