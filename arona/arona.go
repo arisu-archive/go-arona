@@ -284,8 +284,8 @@ func (c *Client) copy() *Client {
 	return clone
 }
 
-func (c *Client) Do(ctx context.Context, req *Request, packet any) (*Response, error) {
-	resp, err := c.bareDo(ctx, req)
+func (c *Client) Do(req *Request, packet any) (*Response, error) {
+	resp, err := c.bareDo(req)
 	if err != nil {
 		return nil, err
 	}
@@ -349,8 +349,8 @@ func (c *Client) handleErrorPacket(responseData ResponseData) (*protos.ErrorPack
 	return errorPacket, nil
 }
 
-func (c *Client) bareDo(ctx context.Context, req *Request) (*Response, error) {
-	resp, err := c.client.Do(req.WithContext(ctx)) //nolint:bodyclose // response body will be handled by caller
+func (c *Client) bareDo(req *Request) (*Response, error) {
+	resp, err := c.client.Do(req.Request) //nolint:bodyclose // response body will be handled by caller
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
@@ -418,7 +418,7 @@ func (c *Client) newRequest(
 	}
 
 	// Build HTTP request
-	req, err := c.buildHTTPRequest(params.apiType, buf, contentType, params.headers)
+	req, err := c.buildHTTPRequest(ctx, params, buf, contentType)
 	if err != nil {
 		return nil, err
 	}
@@ -431,13 +431,13 @@ func (c *Client) newRequest(
 }
 
 // buildHTTPRequest creates the HTTP request with proper headers.
-func (c *Client) buildHTTPRequest(apiType apiType, body *bytes.Buffer, contentType string, customHeaders map[string]string) (*http.Request, error) {
-	u, err := c.getBaseURL(apiType).Parse("/api/gateway")
+func (c *Client) buildHTTPRequest(ctx context.Context, params requestParams, body *bytes.Buffer, contentType string) (*http.Request, error) {
+	u, err := c.getBaseURL(params.apiType).Parse("/api/gateway")
 	if err != nil {
 		return nil, fmt.Errorf("URL parse failed: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, u.String(), body) //nolint:noctx // context will be added in Do method
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), body)
 	if err != nil {
 		return nil, fmt.Errorf("request creation failed: %w", err)
 	}
@@ -450,7 +450,7 @@ func (c *Client) buildHTTPRequest(apiType apiType, body *bytes.Buffer, contentTy
 	}
 	req.Header.Set("Accept-Encoding", "identity")
 	// Apply custom headers
-	for key, value := range customHeaders {
+	for key, value := range params.headers {
 		req.Header.Set(key, value)
 	}
 

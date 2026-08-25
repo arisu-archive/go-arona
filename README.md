@@ -2,7 +2,7 @@
 
 # 🎮 Arona Client
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/arisu-archive/go-arona.svg)](https://pkg.go.dev/github.com/arisu-archive/go-arona) [![Go Report Card](https://goreportcard.com/badge/github.com/arisu-archive/go-arona)](https://goreportcard.com/report/github.com/arisu-archive/go-arona) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Reference](https://pkg.go.dev/badge/github.com/arisu-archive/go-arona.svg)](https://pkg.go.dev/github.com/arisu-archive/go-arona) [![Go Report Card](https://goreportcard.com/badge/github.com/arisu-archive/go-arona)](https://goreportcard.com/report/github.com/arisu-archive/go-arona) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![CI](https://github.com/arisu-archive/go-arona/actions/workflows/ci.yml/badge.svg)](https://github.com/arisu-archive/go-arona/actions/workflows/ci.yml) [![Codecov](https://codecov.io/gh/arisu-archive/go-arona/graph/badge.svg)](https://codecov.io/gh/arisu-archive/go-arona)
 
 **A robust Go client library for interacting with Blue Archive game servers**
 
@@ -54,7 +54,7 @@ go get github.com/arisu-archive/go-arona
 
 ### Requirements
 
-- Go 1.24.3 or higher
+- Go 1.25 or newer; automatic toolchain selection is defined in `go.mod`
 - Dependencies are managed via Go modules
 
 ## 🚀 Quick Start
@@ -269,17 +269,20 @@ client.JSONSerializer = &CustomSerializer{}
 
 ## 🧪 Testing
 
-The project uses Ginkgo and Gomega for testing:
+The project uses Ginkgo and Gomega. Run the same lint and race-enabled test checks enforced by CI:
 
 ```bash
-# Run all tests
-go test ./...
+# Run lint checks
+golangci-lint run --timeout=5m ./...
 
-# Run tests with coverage
-go test -cover ./...
+# Run tests with the race detector
+go test -race ./...
+
+# Run tests with the CI coverage profile
+go test -race -covermode=atomic -coverprofile=coverage.out ./...
 
 # Run specific test suite
-go test -v ./arona
+go test -race -v ./arona
 ```
 
 ## 🤝 Contributing
@@ -299,9 +302,10 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
    go mod download
    ```
 
-3. Run tests:
+3. Run verification:
    ```bash
-   go test ./...
+   golangci-lint run --timeout=5m ./...
+   go test -race -covermode=atomic -coverprofile=coverage.out ./...
    ```
 
 ### Guidelines
@@ -309,7 +313,7 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 - Follow Go best practices and idiomatic code style
 - Write tests for new features
 - Update documentation for API changes
-- Ensure all tests pass before submitting PR
+- Ensure lint and tests pass before submitting PR
 - Use conventional commit messages
 
 ## 📋 Roadmap
