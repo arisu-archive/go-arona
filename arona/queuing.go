@@ -22,11 +22,11 @@ func (p QueuingGetCryptoKeysRequestWrapper) Packet() *protos.RequestPacket {
 	return &p.RequestPacket
 }
 
-func (s *QueuingService) GetCryptoKeys(ctx context.Context, data GetCryptoKeysOptions) (*protos.QueuingGetCryptoKeysResponse, error) {
+func (s *QueuingService) GetCryptoKeys(ctx context.Context, bundle AESKeyBundle) (*protos.QueuingGetCryptoKeysResponse, error) {
 	param := QueuingGetCryptoKeysRequestWrapper{
 		QueuingGetCryptoKeysRequest: &protos.QueuingGetCryptoKeysRequest{
-			ClientGeneratedKey: base64.StdEncoding.EncodeToString(data.KeyBundle.Key),
-			ClientGeneratedIV:  base64.StdEncoding.EncodeToString(data.KeyBundle.IV),
+			ClientGeneratedKey: base64.StdEncoding.EncodeToString(bundle.Key),
+			ClientGeneratedIV:  base64.StdEncoding.EncodeToString(bundle.IV),
 		},
 	}
 	req, err := s.client.R().Gateway(ctx, protos.Protocol_Queuing_GetCryptoKeys, param, WithHash(0))
