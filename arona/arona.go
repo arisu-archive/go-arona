@@ -16,9 +16,12 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/arisu-archive/arona-protos/protos"
+
+	encoder "github.com/arisu-archive/protocol-encoder-go/v2/pkg/encoder/arona"
 )
 
 const (
@@ -39,8 +42,6 @@ type Client struct {
 
 	// User agent used when communicating with the game API.
 	UserAgent string
-
-	ProtocolEncoderConfig *EncoderConfig // Configuration for the protocol encoder service.
 
 	// PublicKey is the RSA public key used for encrypting sensitive data.
 	publicKey *rsa.PublicKey
@@ -223,20 +224,6 @@ func (c *Client) WithServer(server Server) *Client {
 	return c2
 }
 
-type EncoderConfig struct {
-	URL          *url.URL
-	ClientID     string
-	ClientSecret string
-}
-
-func (c *Client) WithEncoder(cfg *EncoderConfig) *Client {
-	// Copy a new Client to avoid modifying the original
-	c2 := c.copy()
-	c2.ProtocolEncoderConfig = cfg
-	c2.initialize()
-	return c2
-}
-
 // initialize sets up the client with default values.
 func (c *Client) initialize() *Client {
 	// Set default URLs based on the server
@@ -285,13 +272,12 @@ func (c *Client) copy() *Client {
 	// and typical for transports.
 	httpClientCopy := *c.client
 	clone := &Client{
-		client:                &httpClientCopy,
-		server:                c.server,
-		publicKey:             c.publicKey,
-		UserAgent:             c.UserAgent,
-		XorEncryptionKey:      c.XorEncryptionKey,
-		ProtocolEncoderConfig: c.ProtocolEncoderConfig,
-		JSONSerializer:        c.JSONSerializer,
+		client:           &httpClientCopy,
+		server:           c.server,
+		publicKey:        c.publicKey,
+		UserAgent:        c.UserAgent,
+		XorEncryptionKey: c.XorEncryptionKey,
+		JSONSerializer:   c.JSONSerializer,
 	}
 	c.clientMu.Unlock()
 	// Shallow copy is sufficient since fields are either value types or pointers
@@ -421,10 +407,7 @@ func (c *Client) newRequest(
 	}
 	// Encode protocol with checksum
 	checksum := computeHash(payload, 0)
-	encodedProtocol, err := c.encodeProtocol(ctx, checksum, params.protocol)
-	if err != nil {
-		return nil, fmt.Errorf("protocol encoding failed: %w", err)
-	}
+	encodedProtocol := encoder.Encode(params.protocol, checksum)
 	// Build final packet
 	packetData := c.processor.BuildPacket(payload, checksum, encodedProtocol, params.session)
 	// Create multipart form
@@ -495,6 +478,46 @@ const (
 	ServerEurope
 	ServerKorea
 )
+
+func (s *Server) Set(v string) error {
+	switch strings.ToLower(v) {
+	case "asia", "as":
+		*s = ServerAsia
+	case "taiwan", "tw":
+		*s = ServerTaiwan
+	case "north-america", "na", "us":
+		*s = ServerNorthAmerica
+	case "europe", "eu":
+		*s = ServerEurope
+	case "korea", "kr":
+		*s = ServerKorea
+	default:
+		return fmt.Errorf("invalid server %q", v)
+	}
+
+	return nil
+}
+
+func (s Server) String() string {
+	switch s {
+	case ServerAsia:
+		return "asia"
+	case ServerTaiwan:
+		return "taiwan"
+	case ServerNorthAmerica:
+		return "north-america"
+	case ServerEurope:
+		return "europe"
+	case ServerKorea:
+		return "korea"
+	default:
+		return "unknown"
+	}
+}
+
+func (Server) Type() string {
+	return "server"
+}
 
 // API mappings for each server.
 type serverApiMapping struct {
